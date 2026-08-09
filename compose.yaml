@@ -1,0 +1,109 @@
+# Defines all containers used by the Misa project.
+services:
+
+  # Python/Flask application container.
+  misa:
+    build:
+      # Use the current folder as the Docker build context.
+      context: .
+
+      # Build this container using our Dockerfile.
+      dockerfile: Dockerfile
+
+    # Easy-to-recognize container name.
+    container_name: misa-app
+
+    ports:
+      # Ubuntu port 8000 → container port 8000.
+      - "8000:8000"
+
+    volumes:
+      # Bind the project folder on Ubuntu to /app in the container.
+      # Changes made in VS Code become immediately visible inside Docker.
+      - type: bind
+        source: .
+        target: /app
+
+    # Run commands from the /app directory.
+    working_dir: /app
+
+    # Start the Python application.
+    command: python app.py
+
+    environment:
+      # Inside Docker, use the service name "ollama", not localhost.
+      OLLAMA_URL: http://ollama:11434
+
+      # Model that the Python application should use.
+      OLLAMA_MODEL: qwen3:1.7b
+
+    depends_on:
+      ollama:
+        # Start Misa only after Ollama passes its health check.
+        condition: service_healthy
+
+    # Restart after crashes or machine restarts unless manually stopped.
+    restart: unless-stopped
+
+  # Local AI model server.
+  ollama:
+    # Use the official Ollama Docker image.
+    image: ollama/ollama:latest
+
+    container_name: misa-ollama
+
+    ports:
+      # Ubuntu port 11434 → Ollama container port 11434.
+      - "11434:11434"
+
+    volumes:
+      # Store downloaded models in a persistent Docker volume.
+      - type: volume
+        source: ollama_models
+        target: /root/.ollama
+
+    healthcheck:
+      # The container is healthy when Ollama can list its models.
+      test: ["CMD", "ollama", "list"]
+
+      # Run the health check every 10 seconds.
+      interval: 10s
+
+      # Fail an individual check if it takes longer than 5 seconds.
+      timeout: 5s
+
+      # Mark the container unhealthy after 10 failed checks.
+      retries: 10
+
+      # Allow Ollama 20 seconds to start before counting failures.
+      start_period: 20s
+
+    restart: unless-stopped
+
+  # Temporary helper container that downloads the AI model.
+  model-pull:
+    image: ollama/ollama:latest
+
+    container_name: misa-model-pull
+
+    environment:
+      # Tell the Ollama CLI to contact the ollama service.
+      OLLAMA_HOST: http://ollama:11434
+
+    # Download the model and then exit.
+    command: pull qwen3:1.7b
+
+    depends_on:
+      ollama:
+        # Do not attempt the download until Ollama is healthy.
+        condition: service_healthy
+
+    # Do not restart after the model download completes.
+    restart: "no"
+
+# Declares named volumes used by the services.
+volumes:
+
+  # Keeps Ollama models even when containers are removed.
+  ollama_models:
+    name: misa_ollama_models

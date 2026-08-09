@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
+    <title>Misa-Misa AI</title>
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
+</head>
+
+<body>
+    <main class="app">
+
+        <!-- Character image -->
+        <section class="character">
+            <img
+                class="character-image"
+                src="{{ url_for('static', filename='images/misa.jpeg') }}"
+                alt="Misa-Misa"
+            >
+
+            <div class="character-shade"></div>
+
+            <div class="character-information">
+                <h1>Misa-Misa</h1>
+
+                <p class="status">
+                    <span class="online-dot"></span>
+                    Online · 
+                </p>
+            </div>
+        </section>
+
+        <!-- Conversation area -->
+        <section
+            id="chat"
+            class="chat"
+            aria-live="polite"
+            aria-label="Conversation with Misa-Misa"
+        ></section>
+
+        <!-- Message input -->
+        <form id="composer" class="composer">
+            <input
+                id="message"
+                type="text"
+                placeholder="Message Misa-Misa..."
+                autocomplete="off"
+                aria-label="Message"
+            >
+
+            <button id="send" type="submit">
+                Send
+            </button>
+        </form>
+    </main>
+
+    <script>
+        const chat = document.getElementById("chat");
+        const composer = document.getElementById("composer");
+        const messageInput = document.getElementById("message");
+        const sendButton = document.getElementById("send");
+
+        /**
+         * Adds a message bubble to the conversation.
+         *
+         * sender must be either "misa" or "user".
+         */
+        function addMessage(sender, text) {
+            const messageElement = document.createElement("article");
+            const avatarElement = document.createElement("div");
+            const contentElement = document.createElement("div");
+            const nameElement = document.createElement("span");
+            const bubbleElement = document.createElement("div");
+
+            messageElement.className = `message ${sender}`;
+
+            avatarElement.className = "message-avatar";
+            avatarElement.textContent = sender === "misa" ? "M" : "S";
+
+            contentElement.className = "message-content";
+
+            nameElement.className = "message-name";
+            nameElement.textContent =
+                sender === "misa" ? "Misa-Misa" : "Sonu";
+
+            bubbleElement.className = "bubble";
+
+            // textContent prevents HTML injection from chat messages.
+            bubbleElement.textContent = text;
+
+            contentElement.appendChild(nameElement);
+            contentElement.appendChild(bubbleElement);
+
+            messageElement.appendChild(avatarElement);
+            messageElement.appendChild(contentElement);
+
+            chat.appendChild(messageElement);
+            chat.scrollTop = chat.scrollHeight;
+
+            return bubbleElement;
+        }
+
+        function setLoading(isLoading) {
+            sendButton.disabled = isLoading;
+            messageInput.disabled = isLoading;
+            sendButton.textContent = isLoading ? "Wait..." : "Send";
+        }
+
+        async function sendMessage() {
+            const text = messageInput.value.trim();
+
+            if (!text || sendButton.disabled) {
+                return;
+            }
+
+            addMessage("user", text);
+
+            messageInput.value = "";
+            setLoading(true);
+
+            const misaBubble = addMessage(
+                "misa",
+                "Misa-Misa is thinking..."
+            );
+
+            try {
+                const response = await fetch("/chat", {
+                    method: "POST",
+
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+
+                    body: JSON.stringify({
+                        message: text
+                    })
+                });
+
+                const data = await response.json();
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.error || "Something went wrong."
+                    );
+                }
+
+                misaBubble.textContent =
+                    data.reply || "I couldn't create a reply, Sonu.";
+            } catch (error) {
+                console.error(error);
+
+                misaBubble.textContent =
+                    "Sorry, Sonu. I couldn't connect to the AI. " +
+                    "Please check whether Flask and Ollama are running.";
+            } finally {
+                setLoading(false);
+                messageInput.focus();
+                chat.scrollTop = chat.scrollHeight;
+            }
+        }
+
+        composer.addEventListener("submit", function (event) {
+            event.preventDefault();
+            sendMessage();
+        });
+
+        // Initial greeting
+        addMessage(
+            "misa",
+            "Sonu! Misa-Misa is online 🖤 What are we creating today?"
+        );
+
+        messageInput.focus();
+    </script>
+</body>
+</html>
