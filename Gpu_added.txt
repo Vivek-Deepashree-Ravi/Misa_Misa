@@ -1,0 +1,210 @@
+Here is the complete process we used to move Ollama in Docker from CPU to NVIDIA GPU.
+
+## 1. Check the NVIDIA GPU
+
+```bash
+lspci | grep -Ei "VGA|3D|NVIDIA"
+ubuntu-drivers devices
+mokutil --sb-state
+uname -r
+```
+
+Your system detected:
+
+```text
+NVIDIA GeForce RTX 3050 6GB Laptop GPU
+```
+
+## 2. Install the NVIDIA driver
+
+Install kernel headers and Ubuntu’s recommended driver:
+
+```bash
+sudo apt update
+sudo apt install linux-headers-$(uname -r)
+sudo ubuntu-drivers install
+sudo reboot
+```
+
+For your laptop, Ubuntu recommended `nvidia-driver-595-open`, so the explicit installation was:
+
+```bash
+sudo apt install nvidia-driver-595-open
+sudo reboot
+```
+
+Verify after reboot:
+
+```bash
+nvidia-smi
+lsmod | grep nvidia
+```
+
+## 3. Add NVIDIA Container Toolkit repository
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+  | sudo gpg --dearmor --yes \
+  -o /usr/share/keyrings/nvidia-container-toolkit-keyring.gpg
+```
+
+```bash
+curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+  | sed 's#deb https://#deb [signed-by=/usr/share/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+  | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list
+```
+
+Install the toolkit:
+
+```bash
+sudo apt update
+sudo apt install -y nvidia-container-toolkit
+```
+
+## 4. Configure Docker for NVIDIA
+
+```bash
+sudo nvidia-ctk runtime configure --runtime=docker
+sudo systemctl restart docker
+```
+
+Test GPU access from Docker:
+
+```bash
+docker run --rm --gpus all ubuntu nvidia-smi
+```
+
+This must display the RTX 3050.
+
+## 5. Give the Ollama container GPU access
+
+Add these lines inside the `ollama` service in `compose.yaml`:
+
+```yaml
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: misa-ollama
+    gpus: all
+
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+    ports:
+      - "11434:11434"
+
+    volumes:
+      - type: volume
+        source: ollama_models
+        target: /root/.ollama
+
+    healthcheck:
+      test: ["CMD", "ollama", "list"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+    restart: unless-stopped
+```
+
+Validate the file:
+
+```bash
+docker compose config
+```
+
+## 6. Recreate Ollama
+
+A normal restart is insufficient because it retains the old container configuration.
+
+```bash
+cd ~/misa_amane
+
+docker compose stop misa
+docker compose rm -sf ollama
+docker compose up -d ollama
+docker compose start misa
+```
+
+Alternatively:
+
+```bash
+docker compose down
+docker compose up -d --force-recreate
+```
+
+Do not add `-v`, because that deletes the model and chat-memory volumes.
+
+## 7. Confirm GPU access inside Ollama
+
+```bash
+docker compose exec ollama nvidia-smi
+```
+
+Check the Docker GPU assignment:
+
+```bash
+docker inspect misa-ollama \
+  --format '{{json .HostConfig.DeviceRequests}}'
+```
+
+Check NVIDIA devices:
+
+```bash
+docker compose exec ollama sh -c 'ls -l /dev/nvidia*'
+```
+
+## 8. Load the model and verify Ollama
+
+```bash
+docker compose exec ollama ollama run qwen3:1.7b \
+  "Reply only: GPU working /no_think"
+```
+
+Then:
+
+```bash
+docker compose exec ollama ollama ps
+nvidia-smi
+```
+
+The desired Ollama result is:
+
+```text
+PROCESSOR    100% GPU
+```
+
+## 9. Disable Qwen reasoning for faster replies
+
+Inside the Ollama request in `app.py`:
+
+```python
+json={
+    "model": OLLAMA_MODEL,
+    "stream": False,
+    "think": False,
+    "keep_alive": "30m",
+    "messages": messages,
+    "options": {
+        "num_ctx": 2048,
+        "num_predict": 150,
+        "temperature": 0.8,
+        "top_p": 0.9,
+        "repeat_penalty": 1.1,
+    },
+},
+```
+
+Restart Flask:
+
+```bash
+docker compose restart misa
+```
+
+This gives you the final path:
+
+```text
+Misa → Ollama container → NVIDIA Container Toolkit → RTX 3050 GPU
+```

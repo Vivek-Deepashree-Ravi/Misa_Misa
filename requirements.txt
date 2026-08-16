@@ -1,2 +1,5 @@
 flask==3.1.2
 requests==2.32.5
+flask-sock==0.7.0
+qdrant-client
+pypdf

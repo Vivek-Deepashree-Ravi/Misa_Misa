@@ -1,109 +1,176 @@
 # Defines all containers used by the Misa project.
 services:
 
-  # Python/Flask application container.
+  # -------------------------------------------------------
+  # Python / Flask application
+  # -------------------------------------------------------
   misa:
     build:
-      # Use the current folder as the Docker build context.
       context: .
-
-      # Build this container using our Dockerfile.
       dockerfile: Dockerfile
 
-    # Easy-to-recognize container name.
     container_name: misa-app
 
     ports:
-      # Ubuntu port 8000 → container port 8000.
+      # Ubuntu port 8000 → Flask container port 8000.
       - "8000:8000"
 
     volumes:
-      # Bind the project folder on Ubuntu to /app in the container.
-      # Changes made in VS Code become immediately visible inside Docker.
+      # Bind the project into the container.
       - type: bind
         source: .
         target: /app
 
-    # Run commands from the /app directory.
     working_dir: /app
 
-    # Start the Python application.
-    command: python app.py
+    command:
+      - python
+      - app.py
 
     environment:
-      # Inside Docker, use the service name "ollama", not localhost.
+      # Ollama connection.
       OLLAMA_URL: http://ollama:11434
-
-      # Model that the Python application should use.
       OLLAMA_MODEL: qwen3:1.7b
+
+      # Local Qdrant vector database.
+      QDRANT_URL: http://qdrant:6333
+
+      # Ollama model used to create RAG embeddings.
+      RAG_EMBED_MODEL: embeddinggemma
+
+      # Name of the Qdrant knowledge collection.
+      RAG_COLLECTION: misa_knowledge
 
     depends_on:
       ollama:
-        # Start Misa only after Ollama passes its health check.
         condition: service_healthy
 
-    # Restart after crashes or machine restarts unless manually stopped.
+      model-pull:
+        condition: service_completed_successfully
+
+      embedding-pull:
+        condition: service_completed_successfully
+
+      qdrant:
+        condition: service_started
+
     restart: unless-stopped
 
-  # Local AI model server.
+
+  # -------------------------------------------------------
+  # Ollama local AI server
+  # -------------------------------------------------------
   ollama:
-    # Use the official Ollama Docker image.
     image: ollama/ollama:latest
 
     container_name: misa-ollama
 
+    # Give Ollama access to the NVIDIA GPU.
+    gpus: all
+
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
     ports:
-      # Ubuntu port 11434 → Ollama container port 11434.
+      # Ubuntu port 11434 → Ollama port 11434.
       - "11434:11434"
 
     volumes:
-      # Store downloaded models in a persistent Docker volume.
+      # Persist downloaded Ollama models.
       - type: volume
         source: ollama_models
         target: /root/.ollama
 
     healthcheck:
-      # The container is healthy when Ollama can list its models.
-      test: ["CMD", "ollama", "list"]
+      # Ollama is healthy when it can list models.
+      test:
+        - CMD
+        - ollama
+        - list
 
-      # Run the health check every 10 seconds.
       interval: 10s
-
-      # Fail an individual check if it takes longer than 5 seconds.
       timeout: 5s
-
-      # Mark the container unhealthy after 10 failed checks.
       retries: 10
-
-      # Allow Ollama 20 seconds to start before counting failures.
       start_period: 20s
 
     restart: unless-stopped
 
-  # Temporary helper container that downloads the AI model.
+
+  # -------------------------------------------------------
+  # Downloads Misa's conversational model
+  # -------------------------------------------------------
   model-pull:
     image: ollama/ollama:latest
 
     container_name: misa-model-pull
 
     environment:
-      # Tell the Ollama CLI to contact the ollama service.
       OLLAMA_HOST: http://ollama:11434
 
-    # Download the model and then exit.
-    command: pull qwen3:1.7b
+    command:
+      - pull
+      - qwen3:1.7b
 
     depends_on:
       ollama:
-        # Do not attempt the download until Ollama is healthy.
         condition: service_healthy
 
-    # Do not restart after the model download completes.
     restart: "no"
 
-# Declares named volumes used by the services.
+
+  # -------------------------------------------------------
+  # Downloads the local RAG embedding model
+  # -------------------------------------------------------
+  embedding-pull:
+    image: ollama/ollama:latest
+
+    container_name: misa-embedding-pull
+
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+
+    command:
+      - pull
+      - embeddinggemma
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+    restart: "no"
+
+
+  # -------------------------------------------------------
+  # Qdrant local vector database
+  # -------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+
+    container_name: misa-qdrant
+
+    ports:
+      # Restrict the Qdrant dashboard/API to this laptop.
+      - "127.0.0.1:6333:6333"
+
+    volumes:
+      # Persist document embeddings and metadata.
+      - type: volume
+        source: qdrant_data
+        target: /qdrant/storage
+
+    restart: unless-stopped
+
+
+# ---------------------------------------------------------
+# Persistent Docker volumes
+# ---------------------------------------------------------
 volumes:
 
-  # Keeps Ollama models even when containers are removed.
+  # Keeps Ollama models across container recreation.
   ollama_models:
     name: misa_ollama_models
+
+  # Keeps the RAG knowledge base across recreation.
+  qdrant_data:
+    name: misa_qdrant_data
