@@ -1,564 +1,474 @@
-# 🌸 Misa-Misa Local AI Companion
+Misa-Misa Local AI 
 
-A **locally hosted AI companion** inspired by Misa Amane, powered by **Ollama** and **Qwen3 1.7B**.
+A private, locally hosted AI companion inspired by Misa Amane. Misa runs through Docker Compose using Flask, Ollama, Qwen3, SQLite, Qdrant, document RAG, and Mem0 long-term memory.
 
-Misa-Misa provides a simple web-based chat interface built with Flask. Everything runs locally through Docker Compose, so **no external AI API key is required**.
+No hosted AI API key is required by the default configuration.
 
-> ⚠️ **Fan Project:** This is an unofficial fan-made project inspired by a fictional character. It is not affiliated with or endorsed by the creators, publishers, or rights holders of *Death Note*.
+Fan project: This is an unofficial fan-made project. It is not affiliated with or endorsed by the creators, publishers, studios, or rights holders of Death Note.
 
----
+✨ Features
 
-## ✨ Features
+Responsive Misa-inspired chat interface
 
-* 🌸 Misa-inspired AI companion interface
-* 💬 Responsive desktop and mobile chat UI
-* 🤖 Local AI inference using Ollama
-* 🧠 Qwen3 1.7B language model
-* 🐍 Flask web application
-* 🔌 Flask JSON chat API
-* 🐳 Complete Docker Compose setup
-* 💾 Persistent Ollama model storage
-* 🔐 No external AI API key required
-* 🛡️ HTML-safe message rendering using `textContent`
-* ⚡ Optimized configuration for CPU-based inference
-* 🔄 Model remains available between container restarts
+Flask HTTP API and real-time WebSocket streaming
 
+Local Qwen3 1.7B inference through Ollama
 
-## 🏗️ Architecture
+GPU-enabled Ollama container
 
-```text
-                    ┌─────────────────────┐
-                    │      Browser        │
-                    │  Desktop / Mobile   │
-                    └──────────┬──────────┘
-                               │
-                               │ HTTP
-                               ▼
-                    ┌─────────────────────┐
-                    │     Misa Flask      │
-                    │      Web App        │
-                    │      Port 8000      │
-                    └──────────┬──────────┘
-                               │
-                               │ HTTP
-                               ▼
-                    ┌─────────────────────┐
-                    │       Ollama        │
-                    │      Port 11434     │
-                    └──────────┬──────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │    Qwen3 1.7B       │
-                    │    Local Model      │
-                    └─────────────────────┘
-                               │
-                               ▼
-                    ┌─────────────────────┐
-                    │ Docker Volume       │
-                    │ misa_ollama_models  │
-                    └─────────────────────┘
-```
+SQLite recent conversation history
 
----
+Document RAG using Qdrant and embeddinggemma
 
-## 🛠️ Technology Stack
+Mem0 long-term personal memory
 
-| Technology     | Purpose                       |
-| -------------- | ----------------------------- |
-| Python 3.11    | Backend runtime               |
-| Flask          | Web server and JSON API       |
-| Ollama         | Local LLM inference           |
-| Qwen3 1.7B     | Language model                |
-| HTML           | Web interface                 |
-| CSS            | UI styling                    |
-| JavaScript     | Chat interaction              |
-| Docker         | Containerization              |
-| Docker Compose | Multi-container orchestration |
+Separate vector collections for documents and personal memories
 
----
+Persistent models, vectors, and conversations
 
-## 📁 Project Structure
+No external AI API key required
 
-```text
+🏗️ Architecture
+
+Browser
+   │ HTTP / WebSocket
+   ▼
+Flask application (port 8000)
+   ├── misa.py
+   │     Character identity and behavior
+   ├── SQLite: misa_memory.db
+   │     Recent complete conversation messages
+   ├── long_term_memory.py → Mem0
+   │     Durable facts about Sonu
+   │                └── Qdrant: misa_personal_memories
+   ├── rag.py
+   │     Document ingestion and retrieval
+   │                └── Qdrant: misa_knowledge
+   └── Ollama (port 11434)
+         ├── qwen3:1.7b
+         └── embeddinggemma
+
+Each response combines:
+
+Misa persona
++ relevant Mem0 personal memories
++ relevant document RAG results
++ recent SQLite conversation history
++ current message
+→ Qwen response
+
+After each response:
+
+Complete exchange → SQLite
+Sonu's message    → Mem0 durable-fact extraction
+
+Misa's generated reply is deliberately excluded from Mem0 extraction so role-play and hallucinations do not become facts about Sonu.
+
+🧠 Memory and knowledge
+
+System
+
+Storage
+
+Purpose
+
+Recent conversation
+
+SQLite (misa_memory.db)
+
+Recent conversational continuity
+
+Long-term memory
+
+Mem0 + Qdrant (misa_personal_memories)
+
+Durable preferences, goals, constraints, and decisions
+
+Document knowledge
+
+rag.py + Qdrant (misa_knowledge)
+
+Relevant text retrieved from indexed files
+
+Character behavior
+
+misa.py
+
+Misa's identity, tone, and behavior
+
+SQLite stores complete messages. Mem0 stores selected user facts. Document RAG stores file knowledge. They are intentionally separate.
+
+🛠️ Technology stack
+
+Technology
+
+Purpose
+
+Python 3.11
+
+Backend runtime
+
+Flask / Flask-Sock
+
+HTTP server and WebSockets
+
+Ollama
+
+Local model inference
+
+Qwen3 1.7B
+
+Conversation and memory extraction
+
+embeddinggemma
+
+Vector embeddings
+
+SQLite
+
+Recent conversation storage
+
+Qdrant
+
+Persistent vector database
+
+Mem0 OSS
+
+Long-term personal memory
+
+Docker Compose
+
+Service orchestration
+
+📁 Project structure
+
 misa_amane/
-│
 ├── app.py
-├── persona.py
+├── misa.py
+├── rag.py
+├── long_term_memory.py
+├── misa_memory.db
 ├── Dockerfile
-├── docker-compose.yml
+├── compose.yaml
 ├── requirements.txt
 ├── README.md
-│
+├── documents/
 ├── static/
-│   ├── css/
-│   │   └── style.css
-│   │
-│   └── images/
-│       └── misa.jpeg
-│
-└── templates/
-    └── index.html
-```
+│   ├── css/style.css
+│   └── images/misa.jpeg
+└── templates/index.html
 
----
+SQLite may create misa_memory.db-wal and misa_memory.db-shm while running. They are normal WAL support files; do not delete them while Misa is active.
 
-# 🚀 Getting Started
+🚀 Getting started
 
-## Prerequisites
+Prerequisites
 
-Make sure the following are installed:
+Docker Engine
 
-* [Docker Engine](https://docs.docker.com/engine/)
-* [Docker Compose v2](https://docs.docker.com/compose/)
+Docker Compose v2
 
-Verify your installation:
+NVIDIA Container Toolkit for GPU acceleration
 
-```bash
 docker --version
 docker compose version
-```
 
----
+Clone and start
 
-## 📥 Clone the Repository
-
-```bash
 git clone <YOUR_REPOSITORY_URL>
 cd misa_amane
-```
+docker compose up -d --build
 
-Replace `<YOUR_REPOSITORY_URL>` with your GitHub repository URL.
+The first startup ensures these models are present:
 
----
-
-# ▶️ Run the Application
-
-Build and start all services:
-
-```bash
-docker compose up --build
-```
-
-On the first startup, the `model-pull` service downloads:
-
-```text
 qwen3:1.7b
-```
+embeddinggemma
 
-The model is approximately **1.4 GB**.
+model-pull and embedding-pull exit after completing their commands. Exited (0) is expected.
 
-The initial startup may take some time depending on your internet connection and hardware.
+Open:
 
-Once downloaded, the model is stored in a persistent Docker volume and does not need to be downloaded again.
-
----
-
-## 🌐 Open the Application
-
-Once the containers are running, open:
-
-```text
 http://localhost:8000
-```
 
-Ollama is also exposed locally at:
+Stop while preserving data:
 
-```text
-http://localhost:11434
-```
-
----
-
-# 💤 Run in Background
-
-To run the application in detached mode:
-
-```bash
-docker compose up --build -d
-```
-
-View the logs:
-
-```bash
-docker compose logs -f misa ollama
-```
-
-Stop the application:
-
-```bash
 docker compose down
-```
 
-> `docker compose down` stops and removes the containers but **does not delete the downloaded model**.
+Do not add -v unless you intentionally want to remove named-volume data.
 
----
+🧩 Services
 
-# 🧩 Services
+Service
 
-| Service      | Container         | Purpose                        | Port    |
-| ------------ | ----------------- | ------------------------------ | ------- |
-| `misa`       | `misa-app`        | Flask web application          | `8000`  |
-| `ollama`     | `misa-ollama`     | Local model server             | `11434` |
-| `model-pull` | `misa-model-pull` | Ensures the model is available | None    |
+Container
 
----
+Purpose
 
-# 💾 Model Storage
+Port
 
-Ollama stores the downloaded model in the named Docker volume:
+misa
 
-```text
-misa_ollama_models
-```
+misa-app
 
-The model persists across:
+Flask application
 
-```bash
-docker compose down
-```
+8000
 
-container restarts, and Flask image rebuilds.
+ollama
 
-The `model-pull` service checks whether the model already exists before downloading it.
+misa-ollama
 
----
+Local model server
 
-## 🔍 Inspect the Model Volume
+11434
 
-Inspect the Docker volume:
+qdrant
 
-```bash
-docker volume inspect misa_ollama_models
-```
+misa-qdrant
 
-List installed Ollama models:
+Vector database
 
-```bash
-docker compose exec ollama ollama list
-```
+6333 localhost only
 
----
+model-pull
 
-# 🧪 Test Ollama Directly
+misa-model-pull
 
-You can test the model without using the Flask interface:
+Ensures Qwen exists
 
-```bash
-docker compose exec ollama ollama run qwen3:1.7b "Reply with only: Misa is ready"
-```
+None
 
-Expected response:
+embedding-pull
 
-```text
-Misa is ready
-```
+misa-embedding-pull
 
-> Use the exact model name `qwen3:1.7b`.
-> `MODEL_NAME` is only an example placeholder and should not be used as a command argument.
+Ensures embedder exists
 
-Check which models are currently loaded:
+None
 
-```bash
-docker compose exec ollama ollama ps
-```
+💾 Persistence
 
----
+Data
 
-# ⚙️ Configuration
+Storage
 
-The Flask container receives the following environment variables from `docker-compose.yml`:
+Ollama models
 
-```yaml
+misa_ollama_models volume
+
+Qdrant collections
+
+misa_qdrant_data volume
+
+Conversation history
+
+Bind-mounted misa_memory.db
+
+Normal restarts and docker compose down preserve all three.
+
+⚙️ Environment
+
 environment:
   OLLAMA_URL: http://ollama:11434
   OLLAMA_MODEL: qwen3:1.7b
-```
+  QDRANT_URL: http://qdrant:6333
+  QDRANT_HOST: qdrant
+  QDRANT_PORT: "6333"
+  RAG_EMBED_MODEL: embeddinggemma
+  RAG_COLLECTION: misa_knowledge
+  MEM0_TELEMETRY: "false"
+  MEM0_LLM_MODEL: qwen3:1.7b
+  MEM0_EMBED_MODEL: embeddinggemma
+  MEM0_COLLECTION: misa_personal_memories
+  MEM0_USER_ID: sonu
 
-The Python application can read these values using:
+Inside Docker, use service names ollama and qdrant; localhost refers to the current container.
 
-```python
-import os
+📚 Document RAG
 
-OLLAMA_BASE_URL = os.getenv(
-    "OLLAMA_URL",
-    "http://ollama:11434"
-)
+RAG reads a file, splits its text into chunks, creates embeddings, and stores them in misa_knowledge.
 
-OLLAMA_CHAT_URL = f"{OLLAMA_BASE_URL.rstrip('/')}/api/chat"
+Ingest
 
-OLLAMA_MODEL = os.getenv(
-    "OLLAMA_MODEL",
-    "qwen3:1.7b"
-)
-```
+docker compose exec misa \
+  python rag.py ingest /app/documents/example.txt
 
----
+Search
 
-# ⚡ Qwen3 CPU Optimization
+docker compose exec misa \
+  python rag.py search "What does the document say?"
 
-For CPU-only inference, response times can be improved by disabling extended thinking and limiting the generated output.
+Count indexed chunks
 
-Example configuration:
+docker compose exec misa python -c \
+  "from rag import qdrant, COLLECTION_NAME; print(qdrant.count(collection_name=COLLECTION_NAME, exact=True))"
 
-```python
-payload = {
-    "model": OLLAMA_MODEL,
-    "stream": False,
-    "think": False,
-    "keep_alive": "10m",
-    "messages": messages,
-    "options": {
-        "num_predict": 250,
-        "temperature": 0.8,
-    },
-}
-```
+RAG context is internal. Ordinary replies should not expose filenames, sources, embeddings, or scores.
 
-### Why these options?
+🧠 Mem0 long-term memory
 
-| Option             | Purpose                            |
-| ------------------ | ---------------------------------- |
-| `think: false`     | Disables extended reasoning        |
-| `keep_alive: 10m`  | Keeps the model loaded             |
-| `num_predict: 250` | Limits response length             |
-| `temperature: 0.8` | Controls response creativity       |
-| `stream: false`    | Returns one complete JSON response |
+Mem0 OSS uses Qwen through Ollama for durable-fact extraction, embeddinggemma for embeddings, and Qdrant for persistent storage.
 
----
+List memories
 
-# 🔧 Development
+docker compose exec misa python -c \
+  "from long_term_memory import get_all_personal_memories; import json; print(json.dumps(get_all_personal_memories(), indent=2, default=str))"
 
-The project directory is bind-mounted into `/app`, allowing changes to HTML, CSS, Python, and persona files to appear inside the Flask container.
+Search memories
 
-After modifying Python code, restart Flask:
+docker compose exec misa python -c \
+  "from long_term_memory import search_personal_memories; import json; print(json.dumps(search_personal_memories('Which coding language does Sonu prefer?'), indent=2, default=str))"
 
-```bash
-docker compose restart misa
-```
+Add a test memory
 
-Follow only the Flask logs:
+docker compose exec misa python -c \
+  "from long_term_memory import add_conversation_memory; import json; print(json.dumps(add_conversation_memory('My preferred programming language is Python.'), indent=2, default=str))"
 
-```bash
+Back up memories
+
+docker compose exec misa python -c \
+  "from long_term_memory import get_all_personal_memories; import json; print(json.dumps(get_all_personal_memories(), indent=2, default=str))" \
+  > mem0_memory_backup.json
+
+Delete Sonu's Mem0 memories
+
+This does not delete SQLite history or document RAG:
+
+docker compose exec misa python -c \
+  "from long_term_memory import memory, MEM0_USER_ID; print(memory.delete_all(user_id=MEM0_USER_ID))"
+
+🗨️ SQLite conversation history
+
+Count messages
+
+docker compose exec misa python -c \
+  "import sqlite3; db=sqlite3.connect('/app/misa_memory.db'); print(db.execute('SELECT COUNT(*) FROM messages').fetchone()); db.close()"
+
+View recent messages
+
+docker compose exec misa python -c \
+  "import sqlite3; db=sqlite3.connect('/app/misa_memory.db'); print(db.execute('SELECT role, content, created_at FROM messages ORDER BY id DESC LIMIT 10').fetchall()); db.close()"
+
+Clear recent history
+
+This does not delete Mem0 or document RAG:
+
+docker compose exec misa python -c \
+  "import sqlite3; db=sqlite3.connect('/app/misa_memory.db'); db.execute('DELETE FROM messages'); db.commit(); db.close(); print('Conversation history cleared')"
+
+🧪 Validation
+
+docker compose config --quiet
+
+docker compose exec misa python -m py_compile \
+  app.py misa.py rag.py long_term_memory.py
+
+No output means validation passed.
+
+Test Ollama:
+
+docker compose exec ollama \
+  ollama run qwen3:1.7b "Reply with only: Misa is ready"
+
+Test application RAG:
+
+docker compose exec misa python -c \
+  "import app; print(repr(app.build_rag_context('What does the indexed document say?')))"
+
+Test application Mem0 retrieval:
+
+docker compose exec misa python -c \
+  "import app; print(app.build_personal_memory_context('Which programming language do I prefer?'))"
+
+Test a complete backend response:
+
+docker compose exec misa python -c \
+  "import app; print(app.generate_reply('Which programming language do I prefer?'))"
+
+🐛 Debugging commands
+
+Container state and logs
+
+docker compose ps -a
+docker compose logs --tail=100 misa ollama qdrant
 docker compose logs -f misa
-```
 
-For HTML/CSS/JavaScript changes, simply refresh the browser.
+Helper exit codes
 
-If the browser is using cached files:
+docker inspect misa-model-pull --format='Exit code: {{.State.ExitCode}}'
+docker inspect misa-embedding-pull --format='Exit code: {{.State.ExitCode}}'
 
-```text
-Ctrl + Shift + R
-```
+Exit code: 0 means successful completion.
 
----
+Installed and loaded models
 
-# 🐛 Troubleshooting
-
-## Chat Request Returns HTTP 500 or Times Out
-
-Check the running containers:
-
-```bash
-docker compose ps
-```
-
-Then inspect the logs:
-
-```bash
-docker compose logs -f misa ollama
-```
-
-Check that the model is installed:
-
-```bash
 docker compose exec ollama ollama list
-```
-
-Test the model directly:
-
-```bash
-docker compose exec ollama ollama run qwen3:1.7b "Reply with only: Misa is ready"
-```
-
-The first response may be slow because Ollama needs to load the model into memory.
-
-CPU-only inference will also be slower than GPU inference.
-
-Recommended settings:
-
-```text
-keep_alive = 10m
-num_predict = 250
-timeout = (10, 300)
-```
-
-Your Flask application should also handle:
-
-```python
-requests.exceptions.ReadTimeout
-```
-
-so that slow model responses return a clear JSON error instead of an unhandled Flask exception.
-
----
-
-## ❌ Flask Cannot Connect to Ollama
-
-Inside Docker, the Flask application must connect to:
-
-```text
-http://ollama:11434
-```
-
-Do **not** use:
-
-```text
-http://localhost:11434
-```
-
-from inside the Flask container.
-
-Why?
-
-Inside Docker:
-
-```text
-localhost
-```
-
-refers to the **current container**, not the Ollama container.
-
-Docker Compose provides service-to-service networking, so Flask should use the service name:
-
-```text
-ollama
-```
-
----
-
-# ✅ Validate Docker Compose
-
-Before starting the application, you can validate your Compose configuration:
-
-```bash
-docker compose config
-```
-
-This is useful for detecting YAML formatting and configuration errors.
-
----
-
-# 📋 Useful Commands
-
-### Start and build
-
-```bash
-docker compose up --build
-```
-
-### Start in background
-
-```bash
-docker compose up --build -d
-```
-
-### Show container status
-
-```bash
-docker compose ps
-```
-
-### Follow application and Ollama logs
-
-```bash
-docker compose logs -f misa ollama
-```
-
-### Restart Flask
-
-```bash
-docker compose restart misa
-```
-
-### List installed models
-
-```bash
-docker compose exec ollama ollama list
-```
-
-### Show loaded models
-
-```bash
 docker compose exec ollama ollama ps
-```
 
-### Stop containers while preserving the model
+GPU
 
-```bash
-docker compose down
-```
+nvidia-smi
 
----
+Service connectivity from Flask
 
-# 🔐 Privacy
+docker compose exec misa python -c \
+  "import requests; print(requests.get('http://ollama:11434/api/tags', timeout=10).status_code)"
 
-Misa-Misa is designed for **local AI inference**.
+docker compose exec misa python -c \
+  "import requests; print(requests.get('http://qdrant:6333/collections', timeout=10).json())"
 
-Your prompts and generated responses are processed by the local Ollama server running in Docker.
+Qdrant collections
 
-No hosted AI API is required by the default setup.
+docker compose exec misa python -c \
+  "from qdrant_client import QdrantClient; client=QdrantClient(url='http://qdrant:6333'); print([item.name for item in client.get_collections().collections])"
 
-However, review any additional integrations or external services you add before using sensitive or private information.
+Expected:
 
----
+misa_knowledge
+misa_personal_memories
 
-# 🎭 Character
+Confirm code visible inside the container
 
-Misa-Misa is designed as a fictional AI companion inspired by **Misa Amane** from *Death Note*.
+docker compose exec misa grep -n "minimum_score" /app/app.py
+docker compose exec misa grep -n "add_conversation_memory" /app/long_term_memory.py
 
-The `persona.py` file contains the character/personality configuration used by the application.
+Restart after Python changes
 
-You can modify the persona to experiment with different:
+docker compose restart misa
+docker compose logs --tail=50 misa
 
-* Personalities
-* Speaking styles
-* Greetings
-* Response behavior
-* Character traits
+Rebuild after changing dependencies or the Dockerfile:
 
----
+docker compose up -d --build
 
-# 🗺️ Roadmap
+Hard-refresh cached browser assets:
 
-Potential future improvements:
+Ctrl + Shift + R
 
-* [ ] Streaming responses
-* [ ] Conversation history
-* [ ] Long-term memory
-* [ ] Voice input
-* [ ] Text-to-speech
-* [ ] Wake-word activation
-* [ ] Multiple AI personalities
-* [ ] Model selection from the UI
-* [ ] GPU acceleration
-* [ ] Authentication
-* [ ] PWA/mobile support
-* [ ] Custom avatar animations
-* [ ] Emotion/state system
+WebSocket close code 1005
 
----
+This normally means the tab refreshed or closed during streaming. app.py should catch simple_websocket.errors.ConnectionClosed before its general exception handler.
+
+Mem0 spaCy and BM25 warnings
+
+Warnings stating that spaCy or FastEmbed is missing do not block semantic search. The base configuration continues using embeddinggemma. Optional NLP/BM25 extras can be installed later if needed.
+
+🔐 Privacy
+
+The default configuration uses local Mem0 OSS, Ollama, Qdrant, and SQLite. It requires no Mem0 Cloud or hosted AI API.
+
+MEM0_TELEMETRY: "false"
+
+Do not add a MEM0_API_KEY, OPENAI_API_KEY, or hosted provider unless external processing is intentional.
+
+🎭 Character
+
+misa.py defines Misa's identity, background, speaking style, technical behavior, and boundaries. Memory and RAG add relevant context without replacing factual accuracy or technical usefulness.
 
 
-# 📜 Disclaimer
 
-Misa-Misa is a **fan-made, unofficial project** inspired by the fictional character Misa Amane from *Death Note*.
+📜 Disclaimer
 
-This project is **not affiliated with, sponsored by, or endorsed by** the creators, publishers, studios, or rights holders of *Death Note*.
+Misa-Misa is a fan-made, unofficial project inspired by Misa Amane from Death Note. It is not affiliated with, sponsored by, or endorsed by the creators, publishers, studios, or rights holders. Related names, imagery, and intellectual property belong to their respective rights holders.
 
-All related character names, imagery, and intellectual property belong to their respective rights holders.
-
-This project is intended for **personal, educational, and experimental use**.
-
----
-
+This project is intended for personal, educational, and experimental use.

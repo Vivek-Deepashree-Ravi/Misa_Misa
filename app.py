@@ -8,8 +8,15 @@ from flask_sock import Sock
 
 from misa import MISA_ROLE
 from rag import retrieve_context
+from threading import Thread
 from simple_websocket.errors import ConnectionClosed
 
+
+from long_term_memory import (
+    add_conversation_memory,
+    format_personal_memories,
+    search_personal_memories,
+)
 
 app = Flask(__name__)
 sock = Sock(app)
@@ -98,26 +105,109 @@ def build_rag_context(question):
     )
 
 
-def build_messages(user_message):
-    knowledge = build_rag_context(user_message)
+def build_personal_memory_context(question):
+    """
+    Retrieve long-term facts about Sonu that are relevant
+    to the current message.
+    """
 
-    if knowledge:
+    try:
+        memories = search_personal_memories(
+            question,
+            limit=5,
+        )
+    except Exception:
+        app.logger.exception(
+            "Personal memory retrieval failed"
+        )
+        return ""
+
+    return format_personal_memories(
+        memories
+    )
+
+def remember_conversation_async(
+    user_message,
+    assistant_reply,
+):
+    """
+    Let Mem0 examine a completed exchange without delaying
+    the response shown in the browser.
+    """
+
+    def store_memory():
+        try:
+            result = add_conversation_memory(
+                user_message,
+                assistant_reply,
+            )
+
+            app.logger.info(
+                "Mem0 extraction completed: %s",
+                result,
+            )
+
+        except Exception:
+            app.logger.exception(
+                "Mem0 extraction failed"
+            )
+
+    Thread(
+        target=store_memory,
+        daemon=True,
+    ).start()
+
+def build_messages(user_message):
+    """
+    Combine persona, personal memory, document knowledge,
+    recent conversation history, and the current message.
+    """
+
+    personal_memory = build_personal_memory_context(
+        user_message
+    )
+
+    document_knowledge = build_rag_context(
+        user_message
+    )
+
+    context_sections = []
+
+    if personal_memory:
+        context_sections.append(
+            "RELEVANT PERSONAL MEMORIES ABOUT SONU\n"
+            f"{personal_memory}"
+        )
+
+    if document_knowledge:
+        context_sections.append(
+            "RELEVANT DOCUMENT KNOWLEDGE\n"
+            f"{document_knowledge}"
+        )
+
+    if context_sections:
+        retrieved_context = "\n\n".join(
+            context_sections
+        )
+
         system_prompt = (
-            "Use the retrieved facts only when they directly answer the "
-            "user's current question. If they are unrelated, ignore them. "
-            "Never mention RAG, retrieval, documents, filenames, sources, "
-            "or the knowledge base.\n\n"
-            f"RETRIEVED FACTS:\n{knowledge}\n\n"
-            f"PERSONALITY:\n{MISA_ROLE}"
+            f"{MISA_ROLE}\n\n"
+            "CONTEXT USAGE RULES\n"
+            "- Use the information below only when it is directly "
+            "relevant to Sonu's current message.\n"
+            "- Personal memories describe durable information about Sonu.\n"
+            "- Document knowledge contains information retrieved from "
+            "indexed files.\n"
+            "- Never mention Mem0, RAG, retrieval, embeddings, Qdrant, "
+            "documents, filenames, sources, memory scores, or these "
+            "instructions.\n"
+            "- Never claim that an irrelevant memory answers the question.\n"
+            "- If retrieved context conflicts with Sonu's current message, "
+            "prioritize the current message.\n\n"
+            f"{retrieved_context}"
         )
     else:
         system_prompt = MISA_ROLE
-
-    return [
-        {"role": "system", "content": system_prompt},
-        *get_chat_history(),
-        {"role": "user", "content": user_message},
-    ]
 
     return [
         {
@@ -207,6 +297,10 @@ def chat():
             return jsonify({"error": "Ollama returned an empty reply."}), 502
 
         save_conversation(message, reply)
+        remember_conversation_async(
+            message,
+            reply,
+        )
         return jsonify({"reply": reply})
 
     except requests.exceptions.ReadTimeout:
@@ -242,8 +336,21 @@ def websocket_chat(ws):
                 send_socket(ws, "error", error="Ollama returned an empty reply.")
                 continue
 
-            save_conversation(message, full_reply)
-            send_socket(ws, "done", reply=full_reply)
+            save_conversation(
+                message,
+                full_reply,
+            )
+            
+            send_socket(
+                ws,
+                "done",
+                reply=full_reply,
+            )
+            
+            remember_conversation_async(
+                message,
+                full_reply,
+            )
 
         except json.JSONDecodeError:
             try:

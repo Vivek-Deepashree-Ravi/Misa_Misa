@@ -3,3 +3,5 @@ requests==2.32.5
 flask-sock==0.7.0
 qdrant-client
 pypdf
+mem0ai
+ollama
