@@ -1,0 +1,497 @@
+GENERAL HUGGING FACE MODEL DOWNLOAD AND RUN GUIDE
+
+PURPOSE
+
+Use this guide to download a Hugging Face model once and run it locally or offline afterward.
+
+REQUIREMENTS
+
+* A free Hugging Face account
+* Docker installed
+* Internet for the initial model download
+* Sufficient disk space
+* Access approval if the model is gated
+
+IMPORTANT SECURITY RULES
+
+* Never paste an access token into source code.
+* Never add a token to a Dockerfile.
+* Never commit a token to Git.
+* Never share a token in messages or screenshots.
+* Use a read-only token unless write access is genuinely required.
+
+---
+
+1. SELECT A MODEL
+
+---
+
+Find the model on:
+
+https://huggingface.co/models
+
+Copy its repository ID.
+
+Example:
+
+organization/model-name
+
+Set the values for your model:
+
+MODEL_ID="organization/model-name"
+MODEL_DIR="$PWD/models/model-name"
+
+For a gated model, open its Hugging Face page and request or accept access before downloading it.
+
+---
+
+2. CREATE LOCAL STORAGE
+
+---
+
+mkdir -p
+hf_cache
+models/model-name
+
+The recommended directory structure is:
+
+project/
+├── hf_cache/
+└── models/
+└── model-name/
+
+---
+
+3. START A TEMPORARY DOWNLOAD CONTAINER
+
+---
+
+docker run --rm -it
+-v "$PWD/hf_cache:/root/.cache/huggingface"
+-v "$PWD/models/model-name:/models"
+python:3.12-slim
+bash
+
+This opens a temporary container and mounts the downloaded files onto the host.
+
+---
+
+4. INSTALL THE HUGGING FACE CLIENT
+
+---
+
+Run inside the temporary container:
+
+pip install --no-cache-dir -U huggingface_hub
+
+---
+
+5. LOG IN
+
+---
+
+For public, ungated models, login may not be required.
+
+For gated or private models, run:
+
+hf auth login
+
+Choose:
+
+Log in with your browser
+
+Open the displayed URL, enter the temporary device code and approve access.
+
+Verify:
+
+hf auth whoami
+
+---
+
+6. DOWNLOAD THE COMPLETE MODEL
+
+---
+
+Run inside the temporary container:
+
+hf download
+organization/model-name
+--local-dir /models
+
+Replace:
+
+organization/model-name
+
+with the real model ID.
+
+Example:
+
+hf download
+ai4bharat/indic-conformer-600m-multilingual
+--local-dir /models
+
+After completion:
+
+exit
+
+The model is now stored locally under:
+
+models/model-name/
+
+---
+
+7. VERIFY THE MODEL
+
+---
+
+du -sh models/model-name
+
+find models/model-name
+-maxdepth 2
+-type f
+| sort
+
+---
+
+8. DOWNLOAD WITHOUT DOCKER
+
+---
+
+If the Hugging Face CLI is installed directly:
+
+hf auth login
+
+hf download
+organization/model-name
+--local-dir ./models/model-name
+
+---
+
+9. DOWNLOAD USING PYTHON
+
+---
+
+Install:
+
+pip install huggingface_hub
+
+Python example:
+
+from huggingface_hub import snapshot_download
+
+MODEL_ID = "organization/model-name"
+MODEL_DIR = "./models/model-name"
+
+snapshot_download(
+repo_id=MODEL_ID,
+local_dir=MODEL_DIR,
+)
+
+For gated models, authenticate first using:
+
+hf auth login
+
+Do not hard-code the token in the Python file.
+
+---
+
+10. LOAD A TRANSFORMERS MODEL FROM THE INTERNET
+
+---
+
+Install:
+
+pip install torch transformers
+
+Python example:
+
+from transformers import AutoModel, AutoTokenizer
+
+MODEL_ID = "organization/model-name"
+
+tokenizer = AutoTokenizer.from_pretrained(
+MODEL_ID,
+)
+
+model = AutoModel.from_pretrained(
+MODEL_ID,
+trust_remote_code=False,
+)
+
+When loading a repository that requires its own custom Python implementation, use:
+
+model = AutoModel.from_pretrained(
+MODEL_ID,
+trust_remote_code=True,
+)
+
+Only enable trust_remote_code for repositories whose code you have reviewed and trust.
+
+---
+
+11. LOAD THE DOWNLOADED MODEL OFFLINE
+
+---
+
+from transformers import AutoModel, AutoTokenizer
+
+MODEL_DIR = "./models/model-name"
+
+tokenizer = AutoTokenizer.from_pretrained(
+MODEL_DIR,
+local_files_only=True,
+)
+
+model = AutoModel.from_pretrained(
+MODEL_DIR,
+local_files_only=True,
+trust_remote_code=False,
+)
+
+For a trusted custom-code model:
+
+model = AutoModel.from_pretrained(
+MODEL_DIR,
+local_files_only=True,
+trust_remote_code=True,
+)
+
+---
+
+12. FORCE OFFLINE MODE
+
+---
+
+Set these variables before running the application:
+
+export HF_HUB_OFFLINE=1
+export TRANSFORMERS_OFFLINE=1
+
+Then run:
+
+python app.py
+
+Docker Compose example:
+
+environment:
+HF_HUB_OFFLINE: "1"
+TRANSFORMERS_OFFLINE: "1"
+
+Offline mode prevents the application from contacting Hugging Face.
+
+---
+
+13. RUN A MODEL INSIDE DOCKER
+
+---
+
+Example:
+
+docker run --rm
+-e HF_HUB_OFFLINE=1
+-e TRANSFORMERS_OFFLINE=1
+-v "$PWD/models/model-name:/models/model-name:ro"
+your-model-image:latest
+
+The read-only suffix:
+
+:ro
+
+prevents the container from changing the downloaded model files.
+
+---
+
+14. USE A MODEL IN DOCKER COMPOSE
+
+---
+
+services:
+model-service:
+image: your-model-image:latest
+
+```
+volumes:
+  - ./models/model-name:/models/model-name:ro
+
+environment:
+  MODEL_PATH: /models/model-name
+  HF_HUB_OFFLINE: "1"
+  TRANSFORMERS_OFFLINE: "1"
+
+restart: unless-stopped
+```
+
+---
+
+15. GPU ACCESS IN DOCKER
+
+---
+
+Test the GPU:
+
+docker run --rm --gpus all
+nvidia/cuda:12.8.0-base-ubuntu22.04
+nvidia-smi
+
+Run a model container with GPU access:
+
+docker run --rm --gpus all
+-v "$PWD/models/model-name:/models/model-name:ro"
+your-model-image:latest
+
+Docker Compose GPU configuration:
+
+services:
+model-service:
+image: your-model-image:latest
+
+```
+deploy:
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1
+          capabilities:
+            - gpu
+```
+
+---
+
+16. COMMON HUGGING FACE COMMANDS
+
+---
+
+Show logged-in account:
+
+hf auth whoami
+
+Log in:
+
+hf auth login
+
+Log out:
+
+hf auth logout
+
+Download a complete repository:
+
+hf download
+organization/model-name
+--local-dir ./models/model-name
+
+Download one file:
+
+hf download
+organization/model-name
+filename.bin
+--local-dir ./models/model-name
+
+List downloaded files:
+
+find ./models/model-name
+-type f
+| sort
+
+Check model size:
+
+du -sh ./models/model-name
+
+---
+
+17. COMMON ERRORS
+
+---
+
+ERROR:
+
+Access denied. This repository requires approval.
+
+SOLUTION:
+
+Open the model page, request access and wait for approval.
+
+ERROR:
+
+401 Unauthorized
+
+SOLUTION:
+
+Run:
+
+hf auth login
+
+Then verify:
+
+hf auth whoami
+
+ERROR:
+
+Repository Not Found
+
+SOLUTION:
+
+Check the exact model repository ID and confirm that the account has access.
+
+ERROR:
+
+No space left on device
+
+SOLUTION:
+
+Check storage:
+
+df -h .
+
+Check model size:
+
+du -sh models/*
+
+ERROR:
+
+CUDA out of memory
+
+SOLUTION:
+
+* Use a smaller model.
+* Use FP16, BF16 or INT8.
+* Reduce batch size.
+* Stop other GPU models.
+* Run models sequentially.
+* Use CPU offloading if supported.
+
+ERROR:
+
+Custom model code cannot be loaded
+
+SOLUTION:
+
+For a trusted model repository, load with:
+
+trust_remote_code=True
+
+Review the repository’s custom Python files before enabling this option.
+
+---
+
+18. GENERAL WORKFLOW
+
+---
+
+Choose a model
+↓
+Check its licence and access requirements
+↓
+Authenticate if necessary
+↓
+Download to a local model directory
+↓
+Verify the files and size
+↓
+Test the model locally
+↓
+Enable offline mode
+↓
+Mount the model read-only into the application
+↓
+Run inference without an internet connection

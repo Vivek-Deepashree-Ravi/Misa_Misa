@@ -1,0 +1,12 @@
+# Hugging Face authentication and cache
+voice/hf_cache/
+
+# Downloaded AI model weights
+voice/models/
+
+# Local microphone test recordings
+voice/test_audio/
+
+# Python cache
+__pycache__/
+*.pyc

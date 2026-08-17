@@ -48,6 +48,10 @@ services:
       MEM0_COLLECTION: misa_personal_memories
       MEM0_USER_ID: sonu
 
+      # Local speech-to-text services.
+      KANNADA_STT_URL: http://kannada-stt:9001
+      ENGLISH_STT_URL: http://english-stt:9002/inference
+
     depends_on:
       ollama:
         condition: service_healthy
@@ -60,6 +64,98 @@ services:
 
       qdrant:
         condition: service_started
+
+      kannada-stt:
+        condition: service_healthy
+
+      english-stt:
+        condition: service_healthy
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------
+  # Kannada speech-to-text
+  # -------------------------------------------------------
+  kannada-stt:
+    build:
+      context: ./voice/indic
+      dockerfile: Dockerfile
+
+    image: misa-indic-asr:cpu
+
+    container_name: misa-indic-asr
+
+    environment:
+      INDIC_MODEL_PATH: /model
+      INDIC_LANGUAGE: kn
+      INDIC_DECODER: ctc
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+
+    ports:
+      # Local debugging access.
+      - "127.0.0.1:9001:9001"
+
+    volumes:
+      - type: bind
+        source: ./voice/models/indic-conformer-600m-multilingual
+        target: /model
+        read_only: true
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:9001/health', timeout=5)"
+
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------
+  # English speech-to-text
+  # -------------------------------------------------------
+  english-stt:
+    build:
+      context: ./voice
+      dockerfile: Dockerfile
+
+    image: misa-whisper:cuda12.8
+
+    container_name: misa-whisper-stt
+
+    # Give Whisper access to the NVIDIA GPU.
+    gpus: all
+
+    environment:
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+    ports:
+      # Local debugging access.
+      - "127.0.0.1:9002:9002"
+
+    volumes:
+      - type: bind
+        source: ./voice/models
+        target: /models
+        read_only: true
+
+    healthcheck:
+      test:
+        - CMD-SHELL
+        - "bash -c 'exec 3<>/dev/tcp/127.0.0.1/9002'"
+
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 30s
 
     restart: unless-stopped
 
@@ -178,6 +274,6 @@ volumes:
   ollama_models:
     name: misa_ollama_models
 
-  # Keeps the RAG knowledge base across recreation.
+  # Keeps RAG and Mem0 Qdrant collections across recreation.
   qdrant_data:
     name: misa_qdrant_data

@@ -26,6 +26,21 @@ OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:1.7b")
 DATABASE_PATH = os.getenv("DATABASE_PATH", "misa_memory.db")
 MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "20"))
 
+
+ENGLISH_STT_URL = os.getenv(
+    "ENGLISH_STT_URL",
+    "http://english-stt:9002/inference",
+)
+
+KANNADA_STT_URL = os.getenv(
+    "KANNADA_STT_URL",
+    "http://kannada-stt:9001/transcribe",
+)
+
+MAX_AUDIO_BYTES = 16 * 1024 * 1024
+
+app.config["MAX_CONTENT_LENGTH"] = MAX_AUDIO_BYTES
+
 OLLAMA_OPTIONS = {
     "num_ctx": 2048,
     "num_predict": 150,
@@ -282,6 +297,183 @@ init_database()
 @app.get("/")
 def home():
     return render_template("index.html")
+
+
+@app.post("/transcribe")
+def transcribe_audio():
+    """
+    Send recorded audio to the selected local STT service.
+
+    Supported languages:
+    - en: Whisper Large V3 Turbo
+    - kn: AI4Bharat IndicConformer
+    """
+
+    uploaded_audio = request.files.get(
+        "audio"
+    )
+
+    language = str(
+        request.form.get(
+            "language",
+            "en",
+        )
+    ).strip().lower()
+
+    if uploaded_audio is None:
+        return jsonify(
+            {
+                "error": (
+                    "Multipart field 'audio' is required."
+                )
+            }
+        ), 400
+
+    if language not in {
+        "en",
+        "kn",
+    }:
+        return jsonify(
+            {
+                "error": (
+                    "Language must be 'en' or 'kn'."
+                )
+            }
+        ), 400
+
+    audio_bytes = uploaded_audio.read()
+
+    if not audio_bytes:
+        return jsonify(
+            {
+                "error": "The uploaded audio is empty."
+            }
+        ), 400
+
+    if len(audio_bytes) > MAX_AUDIO_BYTES:
+        return jsonify(
+            {
+                "error": "The audio file is too large."
+            }
+        ), 413
+
+    filename = (
+        uploaded_audio.filename
+        or "recording.wav"
+    )
+
+    content_type = (
+        uploaded_audio.mimetype
+        or "audio/wav"
+    )
+
+    try:
+        if language == "en":
+            response = requests.post(
+                ENGLISH_STT_URL,
+                files={
+                    "file": (
+                        filename,
+                        audio_bytes,
+                        content_type,
+                    )
+                },
+                data={
+                    "language": "en",
+                    "response_format": "json",
+                    "temperature": "0.0",
+                },
+                timeout=(10, 120),
+            )
+
+        else:
+            response = requests.post(
+                KANNADA_STT_URL,
+                files={
+                    "audio": (
+                        filename,
+                        audio_bytes,
+                        content_type,
+                    )
+                },
+                timeout=(10, 120),
+            )
+
+        response.raise_for_status()
+
+        result = response.json()
+
+        transcript = str(
+            result.get("text", "")
+        ).strip()
+
+        if not transcript:
+            return jsonify(
+                {
+                    "error": (
+                        "Speech recognition returned "
+                        "an empty transcript."
+                    )
+                }
+            ), 502
+
+        return jsonify(
+            {
+                "text": transcript,
+                "language": language,
+            }
+        )
+
+    except requests.exceptions.Timeout:
+        return jsonify(
+            {
+                "error": (
+                    "Speech recognition took too long."
+                )
+            }
+        ), 504
+
+    except requests.exceptions.ConnectionError:
+        app.logger.exception(
+            "Cannot connect to speech service"
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    "Cannot connect to the local "
+                    "speech-recognition service."
+                )
+            }
+        ), 503
+
+    except requests.exceptions.RequestException as error:
+        app.logger.exception(
+            "Speech-recognition request failed"
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    "Speech recognition failed: "
+                    f"{error}"
+                )
+            }
+        ), 502
+
+    except ValueError:
+        app.logger.exception(
+            "Speech service returned invalid JSON"
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    "Speech service returned "
+                    "an invalid response."
+                )
+            }
+        ), 502
 
 
 # Non-streaming fallback endpoint
