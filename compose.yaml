@@ -12,11 +12,9 @@ services:
     container_name: misa-app
 
     ports:
-      # Ubuntu port 8000 → Flask container port 8000.
       - "8000:8000"
 
     volumes:
-      # Bind the project into the container.
       - type: bind
         source: .
         target: /app
@@ -49,7 +47,7 @@ services:
       MEM0_USER_ID: sonu
 
       # Local speech-to-text services.
-      KANNADA_STT_URL: http://kannada-stt:9001
+      KANNADA_STT_URL: http://kannada-stt:9001/transcribe
       ENGLISH_STT_URL: http://english-stt:9002/inference
 
     depends_on:
@@ -60,6 +58,9 @@ services:
         condition: service_completed_successfully
 
       embedding-pull:
+        condition: service_completed_successfully
+
+      model-warmup:
         condition: service_completed_successfully
 
       qdrant:
@@ -83,7 +84,6 @@ services:
       dockerfile: Dockerfile
 
     image: misa-indic-asr:cpu
-
     container_name: misa-indic-asr
 
     environment:
@@ -94,7 +94,6 @@ services:
       TRANSFORMERS_OFFLINE: "1"
 
     ports:
-      # Local debugging access.
       - "127.0.0.1:9001:9001"
 
     volumes:
@@ -127,10 +126,8 @@ services:
       dockerfile: Dockerfile
 
     image: misa-whisper:cuda12.8
-
     container_name: misa-whisper-stt
 
-    # Give Whisper access to the NVIDIA GPU.
     gpus: all
 
     environment:
@@ -138,7 +135,6 @@ services:
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
 
     ports:
-      # Local debugging access.
       - "127.0.0.1:9002:9002"
 
     volumes:
@@ -165,28 +161,24 @@ services:
   # -------------------------------------------------------
   ollama:
     image: ollama/ollama:latest
-
     container_name: misa-ollama
 
-    # Give Ollama access to the NVIDIA GPU.
     gpus: all
 
     environment:
       NVIDIA_VISIBLE_DEVICES: all
       NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      OLLAMA_KEEP_ALIVE: 30m
 
     ports:
-      # Ubuntu port 11434 → Ollama port 11434.
       - "11434:11434"
 
     volumes:
-      # Persist downloaded Ollama models.
       - type: volume
         source: ollama_models
         target: /root/.ollama
 
     healthcheck:
-      # Ollama is healthy when it can list models.
       test:
         - CMD
         - ollama
@@ -205,7 +197,6 @@ services:
   # -------------------------------------------------------
   model-pull:
     image: ollama/ollama:latest
-
     container_name: misa-model-pull
 
     environment:
@@ -227,7 +218,6 @@ services:
   # -------------------------------------------------------
   embedding-pull:
     image: ollama/ollama:latest
-
     container_name: misa-embedding-pull
 
     environment:
@@ -245,19 +235,38 @@ services:
 
 
   # -------------------------------------------------------
+  # Loads Qwen into memory before Misa starts
+  # -------------------------------------------------------
+  model-warmup:
+    image: ollama/ollama:latest
+    container_name: misa-model-warmup
+
+    environment:
+      OLLAMA_HOST: http://ollama:11434
+
+    command:
+      - run
+      - qwen3:1.7b
+      - "Reply only with: ready"
+
+    depends_on:
+      model-pull:
+        condition: service_completed_successfully
+
+    restart: "no"
+
+
+  # -------------------------------------------------------
   # Qdrant local vector database
   # -------------------------------------------------------
   qdrant:
     image: qdrant/qdrant:latest
-
     container_name: misa-qdrant
 
     ports:
-      # Restrict the Qdrant dashboard/API to this laptop.
       - "127.0.0.1:6333:6333"
 
     volumes:
-      # Persist document embeddings and metadata.
       - type: volume
         source: qdrant_data
         target: /qdrant/storage
@@ -270,10 +279,8 @@ services:
 # ---------------------------------------------------------
 volumes:
 
-  # Keeps Ollama models across container recreation.
   ollama_models:
     name: misa_ollama_models
 
-  # Keeps RAG and Mem0 Qdrant collections across recreation.
   qdrant_data:
     name: misa_qdrant_data

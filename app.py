@@ -11,6 +11,10 @@ from rag import retrieve_context
 from threading import Thread
 from simple_websocket.errors import ConnectionClosed
 
+import subprocess
+import tempfile
+from pathlib import Path
+
 
 from long_term_memory import (
     add_conversation_memory,
@@ -290,6 +294,79 @@ def read_message(data):
 def send_socket(ws, event_type, **data):
     ws.send(json.dumps({"type": event_type, **data}))
 
+def convert_audio_to_wav(audio_bytes, original_filename):
+    """
+    Convert browser audio such as WebM/Opus into the format
+    expected by both local speech-recognition services.
+
+    Output:
+    - WAV
+    - 16 kHz
+    - mono
+    - signed 16-bit PCM
+    """
+
+    suffix = Path(
+        original_filename or "recording.webm"
+    ).suffix
+
+    if not suffix:
+        suffix = ".webm"
+
+    with tempfile.TemporaryDirectory() as temporary_directory:
+        input_path = Path(
+            temporary_directory
+        ) / f"input{suffix}"
+
+        output_path = Path(
+            temporary_directory
+        ) / "output.wav"
+
+        input_path.write_bytes(audio_bytes)
+
+        process = subprocess.run(
+            [
+                "ffmpeg",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-y",
+                "-i",
+                str(input_path),
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "-c:a",
+                "pcm_s16le",
+                str(output_path),
+            ],
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        if process.returncode != 0:
+            error_message = (
+                process.stderr.strip()
+                or "FFmpeg could not decode the recording."
+            )
+
+            raise ValueError(error_message)
+
+        if not output_path.exists():
+            raise ValueError(
+                "FFmpeg did not create the WAV recording."
+            )
+
+        converted_audio = output_path.read_bytes()
+
+        if not converted_audio:
+            raise ValueError(
+                "The converted WAV recording is empty."
+            )
+
+        return converted_audio
 
 init_database()
 
@@ -357,15 +434,31 @@ def transcribe_audio():
             }
         ), 413
 
-    filename = (
+    original_filename = (
         uploaded_audio.filename
-        or "recording.wav"
+        or "recording.webm"
     )
-
-    content_type = (
-        uploaded_audio.mimetype
-        or "audio/wav"
-    )
+    
+    try:
+        audio_bytes = convert_audio_to_wav(
+            audio_bytes,
+            original_filename,
+        )
+    except (
+        ValueError,
+        subprocess.TimeoutExpired,
+    ) as error:
+        return jsonify(
+            {
+                "error": (
+                    "The recorded audio could not be decoded: "
+                    f"{error}"
+                )
+            }
+        ), 400
+    
+    filename = "recording.wav"
+    content_type = "audio/wav"
 
     try:
         if language == "en":
