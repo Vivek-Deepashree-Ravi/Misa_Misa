@@ -1,35 +1,65 @@
 import json
 import os
 import sqlite3
-
-import requests
-from flask import Flask, jsonify, render_template, request
-from flask_sock import Sock
-
-from misa import MISA_ROLE
-from rag import retrieve_context
-from threading import Thread
-from simple_websocket.errors import ConnectionClosed
-
 import subprocess
 import tempfile
 from pathlib import Path
+from threading import Thread
 
+import requests
+from flask import (
+    Flask,
+    jsonify,
+    render_template,
+    request,
+)
+from flask_sock import Sock
+from simple_websocket.errors import ConnectionClosed
+from werkzeug.exceptions import HTTPException
 
 from long_term_memory import (
     add_conversation_memory,
     format_personal_memories,
     search_personal_memories,
 )
+from misa import MISA_ROLE
+from rag import retrieve_context
+
 
 app = Flask(__name__)
 sock = Sock(app)
 
-OLLAMA_URL = os.getenv("OLLAMA_URL", "http://ollama:11434").rstrip("/")
-OLLAMA_MODEL = os.getenv("OLLAMA_MODEL", "qwen3:1.7b")
-DATABASE_PATH = os.getenv("DATABASE_PATH", "misa_memory.db")
-MAX_HISTORY_MESSAGES = int(os.getenv("MAX_HISTORY_MESSAGES", "20"))
 
+# ---------------------------------------------------------
+# General configuration
+# ---------------------------------------------------------
+
+OLLAMA_URL = os.getenv(
+    "OLLAMA_URL",
+    "http://ollama:11434",
+).rstrip("/")
+
+OLLAMA_MODEL = os.getenv(
+    "OLLAMA_MODEL",
+    "qwen3:1.7b",
+)
+
+DATABASE_PATH = os.getenv(
+    "DATABASE_PATH",
+    "misa_memory.db",
+)
+
+MAX_HISTORY_MESSAGES = int(
+    os.getenv(
+        "MAX_HISTORY_MESSAGES",
+        "20",
+    )
+)
+
+
+# ---------------------------------------------------------
+# Speech-to-text configuration
+# ---------------------------------------------------------
 
 ENGLISH_STT_URL = os.getenv(
     "ENGLISH_STT_URL",
@@ -41,9 +71,30 @@ KANNADA_STT_URL = os.getenv(
     "http://kannada-stt:9001/transcribe",
 )
 
+
+# ---------------------------------------------------------
+# Text-to-speech configuration
+# ---------------------------------------------------------
+
+KANNADA_TTS_URL = os.getenv(
+    "KANNADA_TTS_URL",
+    "http://kannada-tts:9003/synthesize",
+)
+
+ENGLISH_TTS_URL = os.getenv(
+    "ENGLISH_TTS_URL",
+    "http://english-tts:9004/synthesize",
+)
+
+
+# Maximum uploaded microphone recording: 16 MiB.
 MAX_AUDIO_BYTES = 16 * 1024 * 1024
 
+# Maximum amount of text sent to either TTS service.
+MAX_TTS_TEXT_LENGTH = 1000
+
 app.config["MAX_CONTENT_LENGTH"] = MAX_AUDIO_BYTES
+
 
 OLLAMA_OPTIONS = {
     "num_ctx": 2048,
@@ -54,14 +105,21 @@ OLLAMA_OPTIONS = {
 }
 
 
+# ---------------------------------------------------------
 # SQLite conversation memory
+# ---------------------------------------------------------
+
 def database():
-    return sqlite3.connect(DATABASE_PATH, timeout=30)
+    return sqlite3.connect(
+        DATABASE_PATH,
+        timeout=30,
+    )
 
 
 def init_database():
     with database() as connection:
-        connection.execute("""
+        connection.execute(
+            """
             CREATE TABLE IF NOT EXISTS messages (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 role TEXT NOT NULL
@@ -69,22 +127,40 @@ def init_database():
                 content TEXT NOT NULL,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             )
-        """)
-        connection.execute("PRAGMA journal_mode=WAL")
+            """
+        )
+
+        connection.execute(
+            "PRAGMA journal_mode=WAL"
+        )
 
 
-def save_conversation(user_message, assistant_reply):
+def save_conversation(
+    user_message,
+    assistant_reply,
+):
     with database() as connection:
         connection.executemany(
-            "INSERT INTO messages (role, content) VALUES (?, ?)",
+            """
+            INSERT INTO messages (role, content)
+            VALUES (?, ?)
+            """,
             [
-                ("user", user_message),
-                ("assistant", assistant_reply),
+                (
+                    "user",
+                    user_message,
+                ),
+                (
+                    "assistant",
+                    assistant_reply,
+                ),
             ],
         )
 
 
-def get_chat_history(limit=MAX_HISTORY_MESSAGES):
+def get_chat_history(
+    limit=MAX_HISTORY_MESSAGES,
+):
     with database() as connection:
         rows = connection.execute(
             """
@@ -97,15 +173,25 @@ def get_chat_history(limit=MAX_HISTORY_MESSAGES):
         ).fetchall()
 
     rows.reverse()
+
     return [
-        {"role": role, "content": content}
+        {
+            "role": role,
+            "content": content,
+        }
         for role, content in rows
     ]
 
 
-# Local RAG knowledge
+# ---------------------------------------------------------
+# Local RAG document knowledge
+# ---------------------------------------------------------
+
 def build_rag_context(question):
-    """Retrieve relevant knowledge without exposing sources."""
+    """
+    Retrieve relevant local document knowledge without
+    exposing internal sources to the assistant response.
+    """
 
     try:
         matches = retrieve_context(
@@ -113,21 +199,38 @@ def build_rag_context(question):
             limit=4,
             minimum_score=0.60,
         )
+
     except Exception:
-        app.logger.exception("RAG retrieval failed")
+        app.logger.exception(
+            "RAG retrieval failed"
+        )
         return ""
 
     return "\n\n".join(
-        str(match.get("text", "")).strip()
+        str(
+            match.get(
+                "text",
+                "",
+            )
+        ).strip()
         for match in matches
-        if str(match.get("text", "")).strip()
+        if str(
+            match.get(
+                "text",
+                "",
+            )
+        ).strip()
     )
 
 
+# ---------------------------------------------------------
+# Mem0 personal memory
+# ---------------------------------------------------------
+
 def build_personal_memory_context(question):
     """
-    Retrieve long-term facts about Sonu that are relevant
-    to the current message.
+    Retrieve durable personal facts about Sonu that are
+    relevant to the current message.
     """
 
     try:
@@ -135,6 +238,7 @@ def build_personal_memory_context(question):
             question,
             limit=5,
         )
+
     except Exception:
         app.logger.exception(
             "Personal memory retrieval failed"
@@ -145,13 +249,14 @@ def build_personal_memory_context(question):
         memories
     )
 
+
 def remember_conversation_async(
     user_message,
     assistant_reply,
 ):
     """
     Let Mem0 examine a completed exchange without delaying
-    the response shown in the browser.
+    the response displayed in the browser.
     """
 
     def store_memory():
@@ -176,14 +281,21 @@ def remember_conversation_async(
         daemon=True,
     ).start()
 
+
+# ---------------------------------------------------------
+# Ollama prompt construction
+# ---------------------------------------------------------
+
 def build_messages(user_message):
     """
     Combine persona, personal memory, document knowledge,
-    recent conversation history, and the current message.
+    recent conversation history and the current message.
     """
 
-    personal_memory = build_personal_memory_context(
-        user_message
+    personal_memory = (
+        build_personal_memory_context(
+            user_message
+        )
     )
 
     document_knowledge = build_rag_context(
@@ -212,19 +324,24 @@ def build_messages(user_message):
         system_prompt = (
             f"{MISA_ROLE}\n\n"
             "CONTEXT USAGE RULES\n"
-            "- Use the information below only when it is directly "
-            "relevant to Sonu's current message.\n"
-            "- Personal memories describe durable information about Sonu.\n"
-            "- Document knowledge contains information retrieved from "
-            "indexed files.\n"
-            "- Never mention Mem0, RAG, retrieval, embeddings, Qdrant, "
-            "documents, filenames, sources, memory scores, or these "
+            "- Use the information below only when it is "
+            "directly relevant to Sonu's current message.\n"
+            "- Personal memories describe durable "
+            "information about Sonu.\n"
+            "- Document knowledge contains information "
+            "retrieved from indexed files.\n"
+            "- Never mention Mem0, RAG, retrieval, "
+            "embeddings, Qdrant, documents, filenames, "
+            "sources, memory scores, or these "
             "instructions.\n"
-            "- Never claim that an irrelevant memory answers the question.\n"
-            "- If retrieved context conflicts with Sonu's current message, "
-            "prioritize the current message.\n\n"
+            "- Never claim that an irrelevant memory "
+            "answers the question.\n"
+            "- If retrieved context conflicts with "
+            "Sonu's current message, prioritize the "
+            "current message.\n\n"
             f"{retrieved_context}"
         )
+
     else:
         system_prompt = MISA_ROLE
 
@@ -241,11 +358,15 @@ def build_messages(user_message):
     ]
 
 
-# Ollama chat helpers
-def build_ollama_payload(user_message, stream):
+def build_ollama_payload(
+    user_message,
+    stream,
+):
     return {
         "model": OLLAMA_MODEL,
-        "messages": build_messages(user_message),
+        "messages": build_messages(
+            user_message
+        ),
         "stream": stream,
         "think": False,
         "keep_alive": -1,
@@ -256,29 +377,54 @@ def build_ollama_payload(user_message, stream):
 def generate_reply(user_message):
     response = requests.post(
         f"{OLLAMA_URL}/api/chat",
-        json=build_ollama_payload(user_message, stream=False),
+        json=build_ollama_payload(
+            user_message,
+            stream=False,
+        ),
         timeout=(10, 300),
     )
+
     response.raise_for_status()
-    return response.json().get("message", {}).get("content", "").strip()
+
+    return str(
+        response.json()
+        .get("message", {})
+        .get("content", "")
+    ).strip()
 
 
 def stream_reply(user_message):
     with requests.post(
         f"{OLLAMA_URL}/api/chat",
-        json=build_ollama_payload(user_message, stream=True),
+        json=build_ollama_payload(
+            user_message,
+            stream=True,
+        ),
         stream=True,
         timeout=(10, 300),
     ) as response:
         response.raise_for_status()
 
-        # Small chunks prevent Requests from buffering the streamed response.
-        for line in response.iter_lines(chunk_size=1, decode_unicode=True):
+        # Small chunks prevent Requests from buffering
+        # the streamed response.
+        for line in response.iter_lines(
+            chunk_size=1,
+            decode_unicode=True,
+        ):
             if not line:
                 continue
 
             chunk = json.loads(line)
-            text = chunk.get("message", {}).get("content", "")
+
+            text = str(
+                chunk.get(
+                    "message",
+                    {},
+                ).get(
+                    "content",
+                    "",
+                )
+            )
 
             if text:
                 yield text
@@ -288,16 +434,40 @@ def stream_reply(user_message):
 
 
 def read_message(data):
-    return str(data.get("message", "")).strip()
+    return str(
+        data.get(
+            "message",
+            "",
+        )
+    ).strip()
 
 
-def send_socket(ws, event_type, **data):
-    ws.send(json.dumps({"type": event_type, **data}))
+def send_socket(
+    ws,
+    event_type,
+    **data,
+):
+    ws.send(
+        json.dumps(
+            {
+                "type": event_type,
+                **data,
+            }
+        )
+    )
 
-def convert_audio_to_wav(audio_bytes, original_filename):
+
+# ---------------------------------------------------------
+# Browser audio conversion
+# ---------------------------------------------------------
+
+def convert_audio_to_wav(
+    audio_bytes,
+    original_filename,
+):
     """
     Convert browser audio such as WebM/Opus into the format
-    expected by both local speech-recognition services.
+    expected by the local speech-recognition services.
 
     Output:
     - WAV
@@ -307,22 +477,27 @@ def convert_audio_to_wav(audio_bytes, original_filename):
     """
 
     suffix = Path(
-        original_filename or "recording.webm"
+        original_filename
+        or "recording.webm"
     ).suffix
 
     if not suffix:
         suffix = ".webm"
 
     with tempfile.TemporaryDirectory() as temporary_directory:
-        input_path = Path(
-            temporary_directory
-        ) / f"input{suffix}"
+        input_path = (
+            Path(temporary_directory)
+            / f"input{suffix}"
+        )
 
-        output_path = Path(
-            temporary_directory
-        ) / "output.wav"
+        output_path = (
+            Path(temporary_directory)
+            / "output.wav"
+        )
 
-        input_path.write_bytes(audio_bytes)
+        input_path.write_bytes(
+            audio_bytes
+        )
 
         process = subprocess.run(
             [
@@ -349,17 +524,24 @@ def convert_audio_to_wav(audio_bytes, original_filename):
         if process.returncode != 0:
             error_message = (
                 process.stderr.strip()
-                or "FFmpeg could not decode the recording."
+                or (
+                    "FFmpeg could not decode "
+                    "the recording."
+                )
             )
 
-            raise ValueError(error_message)
+            raise ValueError(
+                error_message
+            )
 
         if not output_path.exists():
             raise ValueError(
                 "FFmpeg did not create the WAV recording."
             )
 
-        converted_audio = output_path.read_bytes()
+        converted_audio = (
+            output_path.read_bytes()
+        )
 
         if not converted_audio:
             raise ValueError(
@@ -368,13 +550,25 @@ def convert_audio_to_wav(audio_bytes, original_filename):
 
         return converted_audio
 
+
+# Initialize SQLite before serving requests.
 init_database()
 
 
+# ---------------------------------------------------------
+# UI
+# ---------------------------------------------------------
+
 @app.get("/")
 def home():
-    return render_template("index.html")
+    return render_template(
+        "index.html"
+    )
 
+
+# ---------------------------------------------------------
+# Speech-to-text API
+# ---------------------------------------------------------
 
 @app.post("/transcribe")
 def transcribe_audio():
@@ -401,7 +595,8 @@ def transcribe_audio():
         return jsonify(
             {
                 "error": (
-                    "Multipart field 'audio' is required."
+                    "Multipart field 'audio' "
+                    "is required."
                 )
             }
         ), 400
@@ -413,7 +608,8 @@ def transcribe_audio():
         return jsonify(
             {
                 "error": (
-                    "Language must be 'en' or 'kn'."
+                    "Language must be "
+                    "'en' or 'kn'."
                 )
             }
         ), 400
@@ -423,14 +619,18 @@ def transcribe_audio():
     if not audio_bytes:
         return jsonify(
             {
-                "error": "The uploaded audio is empty."
+                "error": (
+                    "The uploaded audio is empty."
+                )
             }
         ), 400
 
     if len(audio_bytes) > MAX_AUDIO_BYTES:
         return jsonify(
             {
-                "error": "The audio file is too large."
+                "error": (
+                    "The audio file is too large."
+                )
             }
         ), 413
 
@@ -438,12 +638,13 @@ def transcribe_audio():
         uploaded_audio.filename
         or "recording.webm"
     )
-    
+
     try:
         audio_bytes = convert_audio_to_wav(
             audio_bytes,
             original_filename,
         )
+
     except (
         ValueError,
         subprocess.TimeoutExpired,
@@ -451,12 +652,12 @@ def transcribe_audio():
         return jsonify(
             {
                 "error": (
-                    "The recorded audio could not be decoded: "
-                    f"{error}"
+                    "The recorded audio could not "
+                    f"be decoded: {error}"
                 )
             }
         ), 400
-    
+
     filename = "recording.wav"
     content_type = "audio/wav"
 
@@ -493,11 +694,13 @@ def transcribe_audio():
             )
 
         response.raise_for_status()
-
         result = response.json()
 
         transcript = str(
-            result.get("text", "")
+            result.get(
+                "text",
+                "",
+            )
         ).strip()
 
         if not transcript:
@@ -569,69 +772,353 @@ def transcribe_audio():
         ), 502
 
 
-# Non-streaming fallback endpoint
-@app.post("/chat")
-def chat():
-    message = read_message(request.get_json(silent=True) or {})
-    if not message:
-        return jsonify({"error": "Message is required."}), 400
+# ---------------------------------------------------------
+# Text-to-speech API
+# ---------------------------------------------------------
+
+@app.post("/synthesize")
+def synthesize_audio():
+    """
+    Route text to the selected local TTS service.
+
+    Supported languages:
+    - en: Kokoro English TTS
+    - kn: AI4Bharat IndicF5 Kannada TTS
+    """
+
+    body = request.get_json(
+        silent=True
+    ) or {}
+
+    text = str(
+        body.get(
+            "text",
+            "",
+        )
+    ).strip()
+
+    language = str(
+        body.get(
+            "language",
+            "kn",
+        )
+    ).strip().lower()
+
+    if not text:
+        return jsonify(
+            {
+                "error": (
+                    "JSON field 'text' is required."
+                )
+            }
+        ), 400
+
+    if language not in {
+        "en",
+        "kn",
+    }:
+        return jsonify(
+            {
+                "error": (
+                    "Language must be "
+                    "'en' or 'kn'."
+                )
+            }
+        ), 400
+
+    if len(text) > MAX_TTS_TEXT_LENGTH:
+        return jsonify(
+            {
+                "error": (
+                    "Text must be 1000 "
+                    "characters or less."
+                )
+            }
+        ), 413
+
+    if language == "en":
+        tts_url = ENGLISH_TTS_URL
+        output_filename = "misa-english.wav"
+        service_name = "English Kokoro TTS"
+
+    else:
+        tts_url = KANNADA_TTS_URL
+        output_filename = "misa-kannada.wav"
+        service_name = "Kannada IndicF5 TTS"
 
     try:
-        reply = generate_reply(message)
-        if not reply:
-            return jsonify({"error": "Ollama returned an empty reply."}), 502
+        response = requests.post(
+            tts_url,
+            json={
+                "text": text,
+            },
+            timeout=(10, 600),
+        )
 
-        save_conversation(message, reply)
+        response.raise_for_status()
+
+        content_type = response.headers.get(
+            "Content-Type",
+            "",
+        ).lower()
+
+        if (
+            "audio" not in content_type
+            or not response.content
+        ):
+            app.logger.error(
+                "%s returned a non-audio response: %s",
+                service_name,
+                response.text[:500],
+            )
+
+            return jsonify(
+                {
+                    "error": (
+                        f"{service_name} returned "
+                        "an invalid audio response."
+                    )
+                }
+            ), 502
+
+        return app.response_class(
+            response=response.content,
+            status=200,
+            mimetype="audio/wav",
+            headers={
+                "Content-Disposition": (
+                    "inline; "
+                    f'filename="{output_filename}"'
+                ),
+                "Cache-Control": "no-store",
+                "X-Misa-Language": language,
+            },
+        )
+
+    except requests.exceptions.Timeout:
+        app.logger.exception(
+            "%s timed out",
+            service_name,
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    f"{service_name} took too long."
+                )
+            }
+        ), 504
+
+    except requests.exceptions.ConnectionError:
+        app.logger.exception(
+            "Cannot connect to %s",
+            service_name,
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    f"Cannot connect to {service_name}."
+                )
+            }
+        ), 503
+
+    except requests.exceptions.HTTPError as error:
+        upstream_response = error.response
+
+        upstream_message = ""
+
+        if upstream_response is not None:
+            try:
+                upstream_message = str(
+                    upstream_response.json().get(
+                        "error",
+                        "",
+                    )
+                ).strip()
+
+            except ValueError:
+                upstream_message = (
+                    upstream_response.text.strip()[:500]
+                )
+
+        app.logger.exception(
+            "%s returned an HTTP error",
+            service_name,
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    upstream_message
+                    or (
+                        f"{service_name} could not "
+                        "generate speech."
+                    )
+                )
+            }
+        ), 502
+
+    except requests.exceptions.RequestException as error:
+        app.logger.exception(
+            "%s request failed",
+            service_name,
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    f"{service_name} request failed: "
+                    f"{error}"
+                )
+            }
+        ), 502
+
+
+# ---------------------------------------------------------
+# Non-streaming chat fallback
+# ---------------------------------------------------------
+
+@app.post("/chat")
+def chat():
+    message = read_message(
+        request.get_json(
+            silent=True
+        ) or {}
+    )
+
+    if not message:
+        return jsonify(
+            {
+                "error": "Message is required."
+            }
+        ), 400
+
+    try:
+        reply = generate_reply(
+            message
+        )
+
+        if not reply:
+            return jsonify(
+                {
+                    "error": (
+                        "Ollama returned an empty reply."
+                    )
+                }
+            ), 502
+
+        save_conversation(
+            message,
+            reply,
+        )
+
         remember_conversation_async(
             message,
             reply,
         )
-        return jsonify({"reply": reply})
+
+        return jsonify(
+            {
+                "reply": reply
+            }
+        )
 
     except requests.exceptions.ReadTimeout:
-        return jsonify({"error": "Misa took too long to answer."}), 504
+        return jsonify(
+            {
+                "error": (
+                    "Misa took too long to answer."
+                )
+            }
+        ), 504
+
     except requests.exceptions.ConnectionError:
-        return jsonify({"error": "Cannot connect to Ollama."}), 503
+        return jsonify(
+            {
+                "error": (
+                    "Cannot connect to Ollama."
+                )
+            }
+        ), 503
+
     except requests.exceptions.RequestException as error:
-        app.logger.exception("Ollama request failed")
-        return jsonify({"error": f"Ollama request failed: {error}"}), 502
+        app.logger.exception(
+            "Ollama request failed"
+        )
+
+        return jsonify(
+            {
+                "error": (
+                    "Ollama request failed: "
+                    f"{error}"
+                )
+            }
+        ), 502
 
 
-# Real-time streaming endpoint
+# ---------------------------------------------------------
+# Real-time streaming chat
+# ---------------------------------------------------------
+
 @sock.route("/ws/chat")
 def websocket_chat(ws):
     while True:
         raw_data = ws.receive()
+
         if raw_data is None:
             break
 
         try:
-            message = read_message(json.loads(raw_data))
+            message = read_message(
+                json.loads(raw_data)
+            )
+
             if not message:
-                send_socket(ws, "error", error="Message is required.")
+                send_socket(
+                    ws,
+                    "error",
+                    error="Message is required.",
+                )
                 continue
 
             parts = []
+
             for text in stream_reply(message):
                 parts.append(text)
-                send_socket(ws, "delta", text=text)
 
-            full_reply = "".join(parts).strip()
+                send_socket(
+                    ws,
+                    "delta",
+                    text=text,
+                )
+
+            full_reply = "".join(
+                parts
+            ).strip()
+
             if not full_reply:
-                send_socket(ws, "error", error="Ollama returned an empty reply.")
+                send_socket(
+                    ws,
+                    "error",
+                    error=(
+                        "Ollama returned "
+                        "an empty reply."
+                    ),
+                )
                 continue
 
             save_conversation(
                 message,
                 full_reply,
             )
-            
+
             send_socket(
                 ws,
                 "done",
                 reply=full_reply,
             )
-            
+
             remember_conversation_async(
                 message,
                 full_reply,
@@ -642,8 +1129,11 @@ def websocket_chat(ws):
                 send_socket(
                     ws,
                     "error",
-                    error="Invalid WebSocket message.",
+                    error=(
+                        "Invalid WebSocket message."
+                    ),
                 )
+
             except ConnectionClosed:
                 break
 
@@ -652,8 +1142,11 @@ def websocket_chat(ws):
                 send_socket(
                     ws,
                     "error",
-                    error="Misa took too long to answer.",
+                    error=(
+                        "Misa took too long to answer."
+                    ),
                 )
+
             except ConnectionClosed:
                 break
 
@@ -662,8 +1155,11 @@ def websocket_chat(ws):
                 send_socket(
                     ws,
                     "error",
-                    error="Cannot connect to Ollama.",
+                    error=(
+                        "Cannot connect to Ollama."
+                    ),
                 )
+
             except ConnectionClosed:
                 break
 
@@ -676,13 +1172,16 @@ def websocket_chat(ws):
                 send_socket(
                     ws,
                     "error",
-                    error=f"Ollama request failed: {error}",
+                    error=(
+                        "Ollama request failed: "
+                        f"{error}"
+                    ),
                 )
+
             except ConnectionClosed:
                 break
 
         except ConnectionClosed:
-            # The browser tab was refreshed or closed.
             break
 
         except Exception:
@@ -694,16 +1193,41 @@ def websocket_chat(ws):
                 send_socket(
                     ws,
                     "error",
-                    error="Unexpected streaming error.",
+                    error=(
+                        "Unexpected streaming error."
+                    ),
                 )
+
             except ConnectionClosed:
                 break
 
 
+# ---------------------------------------------------------
+# Error handlers
+# ---------------------------------------------------------
+
+@app.errorhandler(HTTPException)
+def http_error(error):
+    return jsonify(
+        {
+            "error": error.description
+        }
+    ), error.code
+
+
 @app.errorhandler(Exception)
 def unexpected_error(error):
-    app.logger.exception("Unexpected Flask error")
-    return jsonify({"error": "An unexpected server error occurred."}), 500
+    app.logger.exception(
+        "Unexpected Flask error"
+    )
+
+    return jsonify(
+        {
+            "error": (
+                "An unexpected server error occurred."
+            )
+        }
+    ), 500
 
 
 if __name__ == "__main__":

@@ -50,6 +50,10 @@ services:
       KANNADA_STT_URL: http://kannada-stt:9001/transcribe
       ENGLISH_STT_URL: http://english-stt:9002/inference
 
+      # Local text-to-speech services.
+      KANNADA_TTS_URL: http://kannada-tts:9003/synthesize
+      ENGLISH_TTS_URL: http://english-tts:9004/synthesize
+
     depends_on:
       ollama:
         condition: service_healthy
@@ -70,6 +74,12 @@ services:
         condition: service_healthy
 
       english-stt:
+        condition: service_healthy
+
+      kannada-tts:
+        condition: service_healthy
+
+      english-tts:
         condition: service_healthy
 
     restart: unless-stopped
@@ -157,6 +167,110 @@ services:
 
 
   # -------------------------------------------------------
+  # Kannada text-to-speech
+  # -------------------------------------------------------
+  kannada-tts:
+    build:
+      context: ./voice/indicf5
+      dockerfile: Dockerfile
+
+    image: misa-indicf5:cuda
+    container_name: misa-indicf5-tts
+
+    gpus: all
+    shm_size: 2gb
+
+    entrypoint:
+      - python
+      - /app/server.py
+
+    environment:
+      PYTHONPATH: /model
+      WANDB_MODE: disabled
+
+      # Local IndicF5 model and reference voice.
+      INDICF5_MODEL_PATH: /model
+      INDICF5_REFERENCE_AUDIO: /model/prompts/PAN_F_HAPPY_00001.wav
+
+      # Used to unload and warm Qwen around TTS generation.
+      OLLAMA_URL: http://ollama:11434
+      OLLAMA_MODEL: qwen3:1.7b
+
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+
+    ports:
+      - "127.0.0.1:9003:9003"
+
+    volumes:
+      - type: bind
+        source: ./voice/models/indicf5
+        target: /model
+        read_only: true
+
+      - type: volume
+        source: indicf5_cache
+        target: /root/.cache
+
+    depends_on:
+      ollama:
+        condition: service_healthy
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:9003/health', timeout=5)"
+
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------
+  # English text-to-speech
+  # -------------------------------------------------------
+  english-tts:
+    build:
+      context: ./voice/kokoro
+      dockerfile: Dockerfile
+
+    image: misa-kokoro:cpu
+    container_name: misa-kokoro-tts
+
+    environment:
+      KOKORO_VOICE: af_heart
+      KOKORO_LANGUAGE_CODE: a
+      HF_HOME: /cache/huggingface
+
+    ports:
+      - "127.0.0.1:9004:9004"
+
+    volumes:
+      - type: volume
+        source: kokoro_cache
+        target: /cache
+
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:9004/health', timeout=5)"
+
+      interval: 10s
+      timeout: 5s
+      retries: 30
+      start_period: 120s
+
+    restart: unless-stopped
+
+
+  # -------------------------------------------------------
   # Ollama local AI server
   # -------------------------------------------------------
   ollama:
@@ -235,7 +349,7 @@ services:
 
 
   # -------------------------------------------------------
-  # Loads Qwen into memory before Misa starts
+  # Loads Qwen into GPU memory before Misa starts
   # -------------------------------------------------------
   model-warmup:
     image: ollama/ollama:latest
@@ -284,3 +398,9 @@ volumes:
 
   qdrant_data:
     name: misa_qdrant_data
+
+  indicf5_cache:
+    name: indicf5_cache
+
+  kokoro_cache:
+    name: misa_kokoro_cache

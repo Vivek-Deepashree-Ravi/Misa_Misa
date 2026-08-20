@@ -2,72 +2,201 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
+
     <title>Misa AI</title>
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+    <link
+        rel="stylesheet"
+        href="{{ url_for('static', filename='css/style.css') }}"
+    >
 </head>
+
 <body>
     <main class="app">
         <header class="topbar">
             <span class="brand">MISA</span>
-            <span class="status"><i class="online-dot"></i><span id="connection-status">Connecting...</span></span>
+
+            <span class="status">
+                <i class="online-dot"></i>
+
+                <span id="connection-status">
+                    Connecting...
+                </span>
+            </span>
         </header>
 
-        <section class="orb-stage" aria-label="Misa voice visualizer">
-            <div id="orb" class="orb" data-state="idle">
+        <section
+            class="orb-stage"
+            aria-label="Misa voice visualizer"
+        >
+            <div
+                id="orb"
+                class="orb"
+                data-state="idle"
+            >
                 <span class="orb-ring ring-one"></span>
                 <span class="orb-ring ring-two"></span>
+
                 <canvas id="orb-canvas"></canvas>
+
                 <span class="orb-core"></span>
             </div>
         </section>
 
-        <section id="chat" class="chat" aria-live="polite" aria-label="Conversation with Misa"></section>
+        <section
+            id="chat"
+            class="chat"
+            aria-live="polite"
+            aria-label="Conversation with Misa"
+        ></section>
 
         <section class="controls">
-            <p id="assistant-status" class="assistant-status">Ask me anything</p>
+            <p
+                id="assistant-status"
+                class="assistant-status"
+            >
+                Ask me anything
+            </p>
 
-            <form id="composer" class="composer">
-                <select id="language" aria-label="Speech language" title="Speech language">
+            <form
+                id="composer"
+                class="composer"
+            >
+                <select
+                    id="language"
+                    aria-label="Speech language"
+                    title="Speech language"
+                >
                     <option value="en">EN</option>
                     <option value="kn">ಕನ್ನಡ</option>
                 </select>
 
-                <input id="message" type="text" placeholder="Type here ..." autocomplete="off" aria-label="Message">
+                <input
+                    id="message"
+                    type="text"
+                    placeholder="Type here ..."
+                    autocomplete="off"
+                    aria-label="Message"
+                >
 
-                <button id="microphone" class="icon-button" type="button" aria-label="Start voice recording" title="Voice input">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z"/></svg>
+                <button
+                    id="microphone"
+                    class="icon-button"
+                    type="button"
+                    aria-label="Start voice recording"
+                    title="Voice input"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M12 15a3 3 0 0 0 3-3V6a3 3 0 1 0-6 0v6a3 3 0 0 0 3 3Zm5-3a5 5 0 0 1-10 0H5a7 7 0 0 0 6 6.92V22h2v-3.08A7 7 0 0 0 19 12h-2Z"
+                        />
+                    </svg>
                 </button>
 
-                <button id="send" class="icon-button" type="submit" disabled aria-label="Send message" title="Send">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3.4 20.4 17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.95.95 0 0 0-1.3 1.05L3.5 10l10 2-10 2-1.4 5.35a.95.95 0 0 0 1.3 1.05Z"/></svg>
+                <button
+                    id="send"
+                    class="icon-button"
+                    type="submit"
+                    disabled
+                    aria-label="Send message"
+                    title="Send"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="m3.4 20.4 17.45-7.48a1 1 0 0 0 0-1.84L3.4 3.6a.95.95 0 0 0-1.3 1.05L3.5 10l10 2-10 2-1.4 5.35a.95.95 0 0 0 1.3 1.05Z"
+                        />
+                    </svg>
                 </button>
 
-                <button id="clear-chat" class="icon-button" type="button" aria-label="Clear visible conversation" title="Clear conversation">
-                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a10 10 0 1 0 9.8 8h-2.06A8 8 0 1 1 17.66 6.34L14 10h8V2l-2.92 2.92A9.94 9.94 0 0 0 12 2Z"/></svg>
+                <button
+                    id="clear-chat"
+                    class="icon-button"
+                    type="button"
+                    aria-label="Clear visible conversation"
+                    title="Clear conversation"
+                >
+                    <svg
+                        viewBox="0 0 24 24"
+                        aria-hidden="true"
+                    >
+                        <path
+                            d="M12 2a10 10 0 1 0 9.8 8h-2.06A8 8 0 1 1 17.66 6.34L14 10h8V2l-2.92 2.92A9.94 9.94 0 0 0 12 2Z"
+                        />
+                    </svg>
                 </button>
             </form>
         </section>
     </main>
 
     <script>
-        const chat = document.getElementById("chat");
-        const composer = document.getElementById("composer");
-        const messageInput = document.getElementById("message");
-        const sendButton = document.getElementById("send");
-        const microphoneButton = document.getElementById("microphone");
-        const languageSelect = document.getElementById("language");
-        const clearButton = document.getElementById("clear-chat");
-        const connectionStatus = document.getElementById("connection-status");
-        const assistantStatus = document.getElementById("assistant-status");
-        const orb = document.getElementById("orb");
-        const canvas = document.getElementById("orb-canvas");
-        const context = canvas.getContext("2d");
+        const chat = document.getElementById(
+            "chat"
+        );
+
+        const composer = document.getElementById(
+            "composer"
+        );
+
+        const messageInput = document.getElementById(
+            "message"
+        );
+
+        const sendButton = document.getElementById(
+            "send"
+        );
+
+        const microphoneButton = document.getElementById(
+            "microphone"
+        );
+
+        const languageSelect = document.getElementById(
+            "language"
+        );
+
+        const clearButton = document.getElementById(
+            "clear-chat"
+        );
+
+        const connectionStatus = document.getElementById(
+            "connection-status"
+        );
+
+        const assistantStatus = document.getElementById(
+            "assistant-status"
+        );
+
+        const orb = document.getElementById(
+            "orb"
+        );
+
+        const canvas = document.getElementById(
+            "orb-canvas"
+        );
+
+        const context = canvas.getContext(
+            "2d"
+        );
+
 
         let socket = null;
         let activeMisaBubble = null;
+
         let isGenerating = false;
+        let isSpeaking = false;
+
         let reconnectTimer = null;
+
         let mediaRecorder = null;
         let mediaStream = null;
         let audioContext = null;
@@ -76,268 +205,1051 @@
         let isRecording = false;
         let audioLevel = 0;
 
-        const particles = Array.from({length: 220}, () => ({
-            angle: Math.random() * Math.PI * 2,
-            radius: Math.sqrt(Math.random()),
-            speed: 0.0015 + Math.random() * 0.004,
-            size: 0.45 + Math.random() * 1.35,
-            alpha: 0.25 + Math.random() * 0.75
-        }));
+        let replyLanguage = "en";
+
+        let currentSpeechAudio = null;
+        let currentSpeechUrl = null;
+        let speechRequestId = 0;
+
+
+        const particles = Array.from(
+            {
+                length: 220,
+            },
+            () => ({
+                angle: Math.random() * Math.PI * 2,
+                radius: Math.sqrt(Math.random()),
+                speed: (
+                    0.0015
+                    + Math.random() * 0.004
+                ),
+                size: (
+                    0.45
+                    + Math.random() * 1.35
+                ),
+                alpha: (
+                    0.25
+                    + Math.random() * 0.75
+                ),
+            })
+        );
+
 
         function resizeCanvas() {
-            const size = Math.max(1, orb.clientWidth);
-            const ratio = Math.min(window.devicePixelRatio || 1, 2);
+            const size = Math.max(
+                1,
+                orb.clientWidth
+            );
+
+            const ratio = Math.min(
+                window.devicePixelRatio || 1,
+                2
+            );
+
             canvas.width = size * ratio;
             canvas.height = size * ratio;
+
             canvas.style.width = `${size}px`;
             canvas.style.height = `${size}px`;
-            context.setTransform(ratio, 0, 0, ratio, 0, 0);
+
+            context.setTransform(
+                ratio,
+                0,
+                0,
+                ratio,
+                0,
+                0
+            );
         }
+
 
         function drawOrb(time) {
             const size = orb.clientWidth;
             const center = size / 2;
             const radius = size * 0.265;
-            context.clearRect(0, 0, size, size);
 
-            if (analyser && isRecording) {
-                const data = new Uint8Array(analyser.frequencyBinCount);
-                analyser.getByteFrequencyData(data);
-                const average = data.reduce((sum, value) => sum + value, 0) / data.length;
-                audioLevel += ((average / 255) - audioLevel) * 0.22;
+            context.clearRect(
+                0,
+                0,
+                size,
+                size
+            );
+
+            if (
+                analyser
+                && isRecording
+            ) {
+                const data = new Uint8Array(
+                    analyser.frequencyBinCount
+                );
+
+                analyser.getByteFrequencyData(
+                    data
+                );
+
+                const average = (
+                    data.reduce(
+                        (sum, value) => sum + value,
+                        0
+                    )
+                    / data.length
+                );
+
+                audioLevel += (
+                    (average / 255)
+                    - audioLevel
+                ) * 0.22;
+
             } else {
-                audioLevel += (0 - audioLevel) * 0.08;
+                audioLevel += (
+                    0
+                    - audioLevel
+                ) * 0.08;
             }
 
-            const reaction = 1 + audioLevel * 0.5;
-            orb.style.setProperty("--audio-level", audioLevel.toFixed(3));
+            const reaction = (
+                1
+                + audioLevel * 0.5
+            );
+
+            orb.style.setProperty(
+                "--audio-level",
+                audioLevel.toFixed(3)
+            );
 
             for (const particle of particles) {
-                particle.angle += particle.speed * (isRecording ? 2.2 : 1);
-                const drift = Math.sin(time * 0.0015 + particle.angle * 3) * 2.2;
-                const distance = particle.radius * radius * reaction + drift;
-                const x = center + Math.cos(particle.angle) * distance;
-                const y = center + Math.sin(particle.angle) * distance;
+                particle.angle += (
+                    particle.speed
+                    * (
+                        isRecording
+                            ? 2.2
+                            : 1
+                    )
+                );
+
+                const drift = (
+                    Math.sin(
+                        time * 0.0015
+                        + particle.angle * 3
+                    )
+                    * 2.2
+                );
+
+                const distance = (
+                    particle.radius
+                    * radius
+                    * reaction
+                    + drift
+                );
+
+                const x = (
+                    center
+                    + Math.cos(
+                        particle.angle
+                    ) * distance
+                );
+
+                const y = (
+                    center
+                    + Math.sin(
+                        particle.angle
+                    ) * distance
+                );
+
                 context.beginPath();
-                context.arc(x, y, particle.size * reaction, 0, Math.PI * 2);
-                context.fillStyle = `rgba(43, 117, 255, ${particle.alpha})`;
+
+                context.arc(
+                    x,
+                    y,
+                    particle.size * reaction,
+                    0,
+                    Math.PI * 2
+                );
+
+                context.fillStyle = (
+                    `rgba(43, 117, 255, ${particle.alpha})`
+                );
+
                 context.shadowColor = "#1462ff";
                 context.shadowBlur = 5;
+
                 context.fill();
             }
 
-            requestAnimationFrame(drawOrb);
+            requestAnimationFrame(
+                drawOrb
+            );
         }
 
-        function setOrbState(state, text) {
+
+        function setOrbState(
+            state,
+            text
+        ) {
             orb.dataset.state = state;
             assistantStatus.textContent = text;
         }
 
-        function addMessage(sender, text) {
-            chat.classList.add("has-messages");
-            const article = document.createElement("article");
-            const bubble = document.createElement("div");
-            article.className = `message ${sender}`;
+
+        function addMessage(
+            sender,
+            text
+        ) {
+            chat.classList.add(
+                "has-messages"
+            );
+
+            const article = document.createElement(
+                "article"
+            );
+
+            const bubble = document.createElement(
+                "div"
+            );
+
+            article.className = (
+                `message ${sender}`
+            );
+
             bubble.className = "bubble";
             bubble.textContent = text;
-            article.appendChild(bubble);
-            chat.appendChild(article);
-            chat.scrollTop = chat.scrollHeight;
+
+            article.appendChild(
+                bubble
+            );
+
+            chat.appendChild(
+                article
+            );
+
+            chat.scrollTop = (
+                chat.scrollHeight
+            );
+
             return bubble;
         }
 
+
         function websocketUrl() {
-            const protocol = location.protocol === "https:" ? "wss:" : "ws:";
-            return `${protocol}//${location.host}/ws/chat`;
+            const protocol = (
+                location.protocol === "https:"
+                    ? "wss:"
+                    : "ws:"
+            );
+
+            return (
+                `${protocol}//${location.host}/ws/chat`
+            );
         }
+
 
         function updateComposer() {
-            const connected = socket && socket.readyState === WebSocket.OPEN;
-            messageInput.disabled = isGenerating;
-            microphoneButton.disabled = isGenerating;
-            sendButton.disabled = isGenerating || !connected;
+            const connected = (
+                socket
+                && socket.readyState
+                    === WebSocket.OPEN
+            );
+
+            const busy = (
+                isGenerating
+                || isSpeaking
+            );
+
+            messageInput.disabled = busy;
+            microphoneButton.disabled = busy;
+            languageSelect.disabled = busy;
+
+            sendButton.disabled = (
+                busy
+                || !connected
+            );
         }
 
-        function connectSocket() {
-            if (socket && [WebSocket.OPEN, WebSocket.CONNECTING].includes(socket.readyState)) return;
-            connectionStatus.textContent = "Connecting...";
-            socket = new WebSocket(websocketUrl());
 
-            socket.addEventListener("open", () => {
-                connectionStatus.textContent = "Online";
-                updateComposer();
-            });
+        function stopSpeech() {
+            speechRequestId += 1;
 
-            socket.addEventListener("message", event => {
-                let data;
-                try { data = JSON.parse(event.data); } catch { return; }
+            if (currentSpeechAudio) {
+                currentSpeechAudio.pause();
+                currentSpeechAudio.currentTime = 0;
+                currentSpeechAudio = null;
+            }
 
-                if (data.type === "delta") {
-                    if (!activeMisaBubble) activeMisaBubble = addMessage("misa", "");
-                    if (activeMisaBubble.dataset.waiting === "true") {
-                        activeMisaBubble.textContent = "";
-                        activeMisaBubble.dataset.waiting = "false";
-                    }
-                    activeMisaBubble.textContent += data.text || "";
-                    chat.scrollTop = chat.scrollHeight;
-                    return;
-                }
+            if (currentSpeechUrl) {
+                URL.revokeObjectURL(
+                    currentSpeechUrl
+                );
 
-                if (data.type === "done") {
-                    if (activeMisaBubble && activeMisaBubble.dataset.waiting === "true") {
-                        activeMisaBubble.textContent = data.reply || "I couldn't create a reply.";
-                    } else if (!activeMisaBubble && data.reply) {
-                        addMessage("misa", data.reply);
-                    }
-                    activeMisaBubble = null;
-                    isGenerating = false;
-                    setOrbState("idle", "Ask me anything");
-                    updateComposer();
-                    messageInput.focus();
-                    return;
-                }
+                currentSpeechUrl = null;
+            }
 
-                if (data.type === "error") {
-                    const error = data.error || "Misa encountered an error.";
-                    if (activeMisaBubble) activeMisaBubble.textContent = error;
-                    else addMessage("misa", error);
-                    activeMisaBubble = null;
-                    isGenerating = false;
-                    setOrbState("error", "Something went wrong");
-                    updateComposer();
-                }
-            });
-
-            socket.addEventListener("close", () => {
-                connectionStatus.textContent = "Reconnecting...";
-                isGenerating = false;
-                updateComposer();
-                clearTimeout(reconnectTimer);
-                reconnectTimer = setTimeout(connectSocket, 1500);
-            });
-
-            socket.addEventListener("error", () => {
-                connectionStatus.textContent = "Connection error";
-            });
-        }
-
-        function sendMessage() {
-            const text = messageInput.value.trim();
-            if (!text || isGenerating || !socket || socket.readyState !== WebSocket.OPEN) return;
-            addMessage("user", text);
-            activeMisaBubble = addMessage("misa", "Misa is thinking...");
-            activeMisaBubble.dataset.waiting = "true";
-            messageInput.value = "";
-            isGenerating = true;
-            setOrbState("thinking", "Thinking...");
+            isSpeaking = false;
             updateComposer();
-            socket.send(JSON.stringify({message: text}));
         }
 
-        async function startRecording() {
+
+        async function speakReply(
+            text,
+            language
+        ) {
+            const cleanText = String(
+                text || ""
+            ).trim();
+
+            if (!cleanText) {
+                setOrbState(
+                    "idle",
+                    "Ask me anything"
+                );
+
+                return;
+            }
+
+            stopSpeech();
+
+            const requestId = (
+                speechRequestId
+            );
+
+            isSpeaking = true;
+            updateComposer();
+
+            setOrbState(
+                "speaking",
+                language === "kn"
+                    ? "ಮೀಸಾ ಮಾತನಾಡುತ್ತಿದ್ದಾಳೆ..."
+                    : "Misa is speaking..."
+            );
+
             try {
-                mediaStream = await navigator.mediaDevices.getUserMedia({
-                    audio: {echoCancellation: true, noiseSuppression: true, channelCount: 1}
-                });
-                audioContext = new AudioContext();
-                analyser = audioContext.createAnalyser();
-                analyser.fftSize = 256;
-                audioContext.createMediaStreamSource(mediaStream).connect(analyser);
-                audioChunks = [];
-                mediaRecorder = new MediaRecorder(mediaStream);
-                mediaRecorder.addEventListener("dataavailable", event => {
-                    if (event.data.size) audioChunks.push(event.data);
-                });
-                mediaRecorder.addEventListener("stop", transcribeRecording);
-                mediaRecorder.start();
-                isRecording = true;
-                microphoneButton.classList.add("recording");
-                microphoneButton.setAttribute("aria-label", "Stop voice recording");
-                setOrbState("listening", "Listening... tap the microphone to stop");
+                const response = await fetch(
+                    "/synthesize",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type": (
+                                "application/json"
+                            ),
+                        },
+
+                        body: JSON.stringify(
+                            {
+                                text: cleanText,
+                                language: language,
+                            }
+                        ),
+                    }
+                );
+
+                if (!response.ok) {
+                    let errorMessage = (
+                        "Speech generation failed."
+                    );
+
+                    try {
+                        const errorData = (
+                            await response.json()
+                        );
+
+                        errorMessage = (
+                            errorData.error
+                            || errorMessage
+                        );
+
+                    } catch {
+                        // Response was not JSON.
+                    }
+
+                    throw new Error(
+                        errorMessage
+                    );
+                }
+
+                const audioBlob = (
+                    await response.blob()
+                );
+
+                if (
+                    requestId
+                        !== speechRequestId
+                    || !audioBlob.size
+                ) {
+                    return;
+                }
+
+                currentSpeechUrl = (
+                    URL.createObjectURL(
+                        audioBlob
+                    )
+                );
+
+                currentSpeechAudio = new Audio(
+                    currentSpeechUrl
+                );
+
+                currentSpeechAudio.addEventListener(
+                    "ended",
+                    () => {
+                        if (
+                            requestId
+                                !== speechRequestId
+                        ) {
+                            return;
+                        }
+
+                        if (currentSpeechUrl) {
+                            URL.revokeObjectURL(
+                                currentSpeechUrl
+                            );
+                        }
+
+                        currentSpeechAudio = null;
+                        currentSpeechUrl = null;
+                        isSpeaking = false;
+
+                        updateComposer();
+
+                        setOrbState(
+                            "idle",
+                            "Ask me anything"
+                        );
+
+                        messageInput.focus();
+                    },
+                    {
+                        once: true,
+                    }
+                );
+
+                currentSpeechAudio.addEventListener(
+                    "error",
+                    () => {
+                        if (
+                            requestId
+                                !== speechRequestId
+                        ) {
+                            return;
+                        }
+
+                        currentSpeechAudio = null;
+
+                        if (currentSpeechUrl) {
+                            URL.revokeObjectURL(
+                                currentSpeechUrl
+                            );
+
+                            currentSpeechUrl = null;
+                        }
+
+                        isSpeaking = false;
+                        updateComposer();
+
+                        setOrbState(
+                            "error",
+                            "Audio playback failed"
+                        );
+                    },
+                    {
+                        once: true,
+                    }
+                );
+
+                await currentSpeechAudio.play();
+
             } catch (error) {
-                console.error(error);
-                setOrbState("error", "Microphone permission was not granted");
+                console.error(
+                    "Misa speech error:",
+                    error
+                );
+
+                if (
+                    requestId
+                        === speechRequestId
+                ) {
+                    isSpeaking = false;
+                    updateComposer();
+
+                    setOrbState(
+                        "error",
+                        error.message
+                        || "Speech generation failed"
+                    );
+
+                    setTimeout(
+                        () => {
+                            if (
+                                requestId
+                                    === speechRequestId
+                                && !isGenerating
+                                && !isSpeaking
+                            ) {
+                                setOrbState(
+                                    "idle",
+                                    "Ask me anything"
+                                );
+                            }
+                        },
+                        3000
+                    );
+                }
             }
         }
 
+
+        function connectSocket() {
+            if (
+                socket
+                && [
+                    WebSocket.OPEN,
+                    WebSocket.CONNECTING,
+                ].includes(
+                    socket.readyState
+                )
+            ) {
+                return;
+            }
+
+            connectionStatus.textContent = (
+                "Connecting..."
+            );
+
+            socket = new WebSocket(
+                websocketUrl()
+            );
+
+            socket.addEventListener(
+                "open",
+                () => {
+                    connectionStatus.textContent = (
+                        "Online"
+                    );
+
+                    updateComposer();
+                }
+            );
+
+            socket.addEventListener(
+                "message",
+                event => {
+                    let data;
+
+                    try {
+                        data = JSON.parse(
+                            event.data
+                        );
+                    } catch {
+                        return;
+                    }
+
+                    if (
+                        data.type === "delta"
+                    ) {
+                        if (!activeMisaBubble) {
+                            activeMisaBubble = (
+                                addMessage(
+                                    "misa",
+                                    ""
+                                )
+                            );
+                        }
+
+                        if (
+                            activeMisaBubble.dataset
+                                .waiting === "true"
+                        ) {
+                            activeMisaBubble.textContent = "";
+                            activeMisaBubble.dataset.waiting = "false";
+                        }
+
+                        activeMisaBubble.textContent += (
+                            data.text || ""
+                        );
+
+                        chat.scrollTop = (
+                            chat.scrollHeight
+                        );
+
+                        return;
+                    }
+
+                    if (
+                        data.type === "done"
+                    ) {
+                        const completedReply = String(
+                            data.reply || ""
+                        ).trim();
+
+                        if (
+                            activeMisaBubble
+                            && activeMisaBubble.dataset
+                                .waiting === "true"
+                        ) {
+                            activeMisaBubble.textContent = (
+                                completedReply
+                                || (
+                                    "I couldn't create "
+                                    + "a reply."
+                                )
+                            );
+
+                        } else if (
+                            !activeMisaBubble
+                            && completedReply
+                        ) {
+                            addMessage(
+                                "misa",
+                                completedReply
+                            );
+                        }
+
+                        activeMisaBubble = null;
+                        isGenerating = false;
+
+                        updateComposer();
+
+                        if (completedReply) {
+                            speakReply(
+                                completedReply,
+                                replyLanguage
+                            );
+
+                        } else {
+                            setOrbState(
+                                "idle",
+                                "Ask me anything"
+                            );
+
+                            messageInput.focus();
+                        }
+
+                        return;
+                    }
+
+                    if (
+                        data.type === "error"
+                    ) {
+                        const error = (
+                            data.error
+                            || (
+                                "Misa encountered "
+                                + "an error."
+                            )
+                        );
+
+                        if (activeMisaBubble) {
+                            activeMisaBubble.textContent = (
+                                error
+                            );
+
+                        } else {
+                            addMessage(
+                                "misa",
+                                error
+                            );
+                        }
+
+                        activeMisaBubble = null;
+                        isGenerating = false;
+
+                        setOrbState(
+                            "error",
+                            "Something went wrong"
+                        );
+
+                        updateComposer();
+                    }
+                }
+            );
+
+            socket.addEventListener(
+                "close",
+                () => {
+                    connectionStatus.textContent = (
+                        "Reconnecting..."
+                    );
+
+                    isGenerating = false;
+
+                    updateComposer();
+
+                    clearTimeout(
+                        reconnectTimer
+                    );
+
+                    reconnectTimer = setTimeout(
+                        connectSocket,
+                        1500
+                    );
+                }
+            );
+
+            socket.addEventListener(
+                "error",
+                () => {
+                    connectionStatus.textContent = (
+                        "Connection error"
+                    );
+                }
+            );
+        }
+
+
+        function sendMessage() {
+            const text = (
+                messageInput.value.trim()
+            );
+
+            if (
+                !text
+                || isGenerating
+                || isSpeaking
+                || !socket
+                || socket.readyState
+                    !== WebSocket.OPEN
+            ) {
+                return;
+            }
+
+            replyLanguage = (
+                languageSelect.value
+            );
+
+            stopSpeech();
+
+            addMessage(
+                "user",
+                text
+            );
+
+            activeMisaBubble = addMessage(
+                "misa",
+                "Misa is thinking..."
+            );
+
+            activeMisaBubble.dataset.waiting = (
+                "true"
+            );
+
+            messageInput.value = "";
+            isGenerating = true;
+
+            setOrbState(
+                "thinking",
+                "Thinking..."
+            );
+
+            updateComposer();
+
+            socket.send(
+                JSON.stringify(
+                    {
+                        message: text,
+                    }
+                )
+            );
+        }
+
+
+        async function startRecording() {
+            try {
+                stopSpeech();
+
+                mediaStream = (
+                    await navigator.mediaDevices
+                        .getUserMedia(
+                            {
+                                audio: {
+                                    echoCancellation: true,
+                                    noiseSuppression: true,
+                                    channelCount: 1,
+                                },
+                            }
+                        )
+                );
+
+                audioContext = new AudioContext();
+
+                analyser = (
+                    audioContext.createAnalyser()
+                );
+
+                analyser.fftSize = 256;
+
+                audioContext
+                    .createMediaStreamSource(
+                        mediaStream
+                    )
+                    .connect(
+                        analyser
+                    );
+
+                audioChunks = [];
+
+                mediaRecorder = new MediaRecorder(
+                    mediaStream
+                );
+
+                mediaRecorder.addEventListener(
+                    "dataavailable",
+                    event => {
+                        if (event.data.size) {
+                            audioChunks.push(
+                                event.data
+                            );
+                        }
+                    }
+                );
+
+                mediaRecorder.addEventListener(
+                    "stop",
+                    transcribeRecording
+                );
+
+                mediaRecorder.start();
+
+                isRecording = true;
+
+                microphoneButton.classList.add(
+                    "recording"
+                );
+
+                microphoneButton.setAttribute(
+                    "aria-label",
+                    "Stop voice recording"
+                );
+
+                setOrbState(
+                    "listening",
+                    (
+                        "Listening... tap the "
+                        + "microphone to stop"
+                    )
+                );
+
+            } catch (error) {
+                console.error(error);
+
+                setOrbState(
+                    "error",
+                    (
+                        "Microphone permission "
+                        + "was not granted"
+                    )
+                );
+            }
+        }
+
+
         function stopRecording() {
-            if (mediaRecorder && mediaRecorder.state !== "inactive") mediaRecorder.stop();
+            if (
+                mediaRecorder
+                && mediaRecorder.state
+                    !== "inactive"
+            ) {
+                mediaRecorder.stop();
+            }
+
             isRecording = false;
-            microphoneButton.classList.remove("recording");
-            microphoneButton.setAttribute("aria-label", "Start voice recording");
-            setOrbState("thinking", "Transcribing...");
-            mediaStream?.getTracks().forEach(track => track.stop());
-            if (audioContext) audioContext.close();
+
+            microphoneButton.classList.remove(
+                "recording"
+            );
+
+            microphoneButton.setAttribute(
+                "aria-label",
+                "Start voice recording"
+            );
+
+            setOrbState(
+                "thinking",
+                "Transcribing..."
+            );
+
+            mediaStream
+                ?.getTracks()
+                .forEach(
+                    track => track.stop()
+                );
+
+            if (audioContext) {
+                audioContext.close();
+            }
+
             analyser = null;
         }
 
+
         async function transcribeRecording() {
-            const mimeType = mediaRecorder?.mimeType || "audio/webm";
-            const extension = mimeType.includes("ogg") ? "ogg" : "webm";
-            const blob = new Blob(audioChunks, {type: mimeType});
+            const mimeType = (
+                mediaRecorder?.mimeType
+                || "audio/webm"
+            );
+
+            const extension = (
+                mimeType.includes("ogg")
+                    ? "ogg"
+                    : "webm"
+            );
+
+            const blob = new Blob(
+                audioChunks,
+                {
+                    type: mimeType,
+                }
+            );
+
             const formData = new FormData();
-            formData.append("audio", blob, `recording.${extension}`);
-            formData.append("language", languageSelect.value);
+
+            formData.append(
+                "audio",
+                blob,
+                `recording.${extension}`
+            );
+
+            formData.append(
+                "language",
+                languageSelect.value
+            );
 
             try {
-                const response = await fetch("/transcribe", {method: "POST", body: formData});
-                const data = await response.json();
-                if (!response.ok) throw new Error(data.error || "Transcription failed");
-                
-                
-                const transcript = (data.text || "").trim();
+                const response = await fetch(
+                    "/transcribe",
+                    {
+                        method: "POST",
+                        body: formData,
+                    }
+                );
+
+                const data = (
+                    await response.json()
+                );
+
+                if (!response.ok) {
+                    throw new Error(
+                        data.error
+                        || "Transcription failed"
+                    );
+                }
+
+                const transcript = String(
+                    data.text || ""
+                ).trim();
 
                 if (!transcript) {
                     setOrbState(
                         "idle",
                         "No speech detected"
                     );
-                
+
                     return;
                 }
-                
+
                 messageInput.value = transcript;
-                
+
                 setOrbState(
                     "thinking",
                     "Sending to Misa..."
                 );
-                
+
                 if (
-                    socket &&
-                    socket.readyState === WebSocket.OPEN
+                    socket
+                    && socket.readyState
+                        === WebSocket.OPEN
                 ) {
                     sendMessage();
+
                 } else {
                     setOrbState(
                         "error",
-                        "Misa is reconnecting. Please try again."
+                        (
+                            "Misa is reconnecting. "
+                            + "Please try again."
+                        )
                     );
-                
+
                     connectSocket();
                 }
 
-
             } catch (error) {
                 console.error(error);
-                setOrbState("error", error.message || "Transcription failed");
+
+                setOrbState(
+                    "error",
+                    error.message
+                    || "Transcription failed"
+                );
             }
         }
 
-        composer.addEventListener("submit", event => { event.preventDefault(); sendMessage(); });
-        microphoneButton.addEventListener("click", () => isRecording ? stopRecording() : startRecording());
-        clearButton.addEventListener("click", () => {
-            chat.replaceChildren();
-            chat.classList.remove("has-messages");
-            setOrbState("idle", "Ask me anything");
-        });
-        window.addEventListener("resize", resizeCanvas);
-        window.addEventListener("beforeunload", () => {
-            clearTimeout(reconnectTimer);
-            mediaStream?.getTracks().forEach(track => track.stop());
-            socket?.close();
-        });
+
+        composer.addEventListener(
+            "submit",
+            event => {
+                event.preventDefault();
+                sendMessage();
+            }
+        );
+
+
+        microphoneButton.addEventListener(
+            "click",
+            () => {
+                if (isRecording) {
+                    stopRecording();
+                } else {
+                    startRecording();
+                }
+            }
+        );
+
+
+        clearButton.addEventListener(
+            "click",
+            () => {
+                stopSpeech();
+
+                chat.replaceChildren();
+
+                chat.classList.remove(
+                    "has-messages"
+                );
+
+                setOrbState(
+                    "idle",
+                    "Ask me anything"
+                );
+
+                messageInput.focus();
+            }
+        );
+
+
+        window.addEventListener(
+            "resize",
+            resizeCanvas
+        );
+
+
+        window.addEventListener(
+            "beforeunload",
+            () => {
+                clearTimeout(
+                    reconnectTimer
+                );
+
+                stopSpeech();
+
+                mediaStream
+                    ?.getTracks()
+                    .forEach(
+                        track => track.stop()
+                    );
+
+                socket?.close();
+            }
+        );
+
 
         resizeCanvas();
         requestAnimationFrame(drawOrb);

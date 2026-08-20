@@ -1,0 +1,166 @@
+import argparse
+import os
+import sys
+
+import numpy as np
+import soundfile as sf
+import torch
+
+MODEL_PATH = "/model"
+
+if MODEL_PATH not in sys.path:
+    sys.path.insert(0, MODEL_PATH)
+
+from model import INF5Config, INF5Model
+
+
+DEFAULT_REFERENCE_AUDIO = (
+    "/model/prompts/PAN_F_HAPPY_00001.wav"
+)
+
+DEFAULT_REFERENCE_TEXT = (
+    "ਭਹੰਪੀ ਵਿੱਚ ਸਮਾਰਕਾਂ ਦੇ ਭਵਨ ਨਿਰਮਾਣ ਕਲਾ ਦੇ "
+    "ਵੇਰਵੇ ਗੁੰਝਲਦਾਰ ਅਤੇ ਹੈਰਾਨ ਕਰਨ ਵਾਲੇ ਹਨ, "
+    "ਜੋ ਮੈਨੂੰ ਖੁਸ਼ ਕਰਦੇ ਹਨ।"
+)
+
+
+def parse_arguments():
+    parser = argparse.ArgumentParser(
+        description="Generate Kannada speech with IndicF5."
+    )
+
+    parser.add_argument(
+        "--model",
+        default=MODEL_PATH,
+        help="Local IndicF5 model directory.",
+    )
+
+    parser.add_argument(
+        "--text",
+        required=True,
+        help="Text that IndicF5 should speak.",
+    )
+
+    parser.add_argument(
+        "--reference-audio",
+        default=DEFAULT_REFERENCE_AUDIO,
+        help="Reference speaker WAV file.",
+    )
+
+    parser.add_argument(
+        "--reference-text",
+        default=DEFAULT_REFERENCE_TEXT,
+        help="Exact transcript of the reference audio.",
+    )
+
+    parser.add_argument(
+        "--output",
+        default="/output/misa-kannada.wav",
+        help="Output WAV path.",
+    )
+
+    return parser.parse_args()
+
+
+def main():
+    args = parse_arguments()
+
+    print(
+        f"CUDA available: {torch.cuda.is_available()}",
+        flush=True,
+    )
+
+    if torch.cuda.is_available():
+        print(
+            f"GPU: {torch.cuda.get_device_name(0)}",
+            flush=True,
+        )
+
+    if not os.path.isdir(args.model):
+        raise FileNotFoundError(
+            f"Model directory does not exist: {args.model}"
+        )
+
+    if not os.path.isfile(args.reference_audio):
+        raise FileNotFoundError(
+            "Reference audio does not exist: "
+            f"{args.reference_audio}"
+        )
+
+    output_directory = os.path.dirname(
+        os.path.abspath(args.output)
+    )
+
+    os.makedirs(
+        output_directory,
+        exist_ok=True,
+    )
+
+    print(
+        "Loading IndicF5 directly from local files...",
+        flush=True,
+    )
+
+    # Load configuration without asking Transformers to load
+    # model.safetensors itself.
+    config = INF5Config.from_pretrained(
+        args.model,
+        local_files_only=True,
+    )
+
+    # The custom constructor loads model.safetensors through
+    # IndicF5's own load_model() function.
+    model = INF5Model(config)
+    model.eval()
+
+    print(
+        "Generating Kannada speech...",
+        flush=True,
+    )
+
+    with torch.inference_mode():
+        audio = model(
+            args.text,
+            ref_audio_path=args.reference_audio,
+            ref_text=args.reference_text,
+        )
+
+    audio = np.asarray(
+        audio,
+        dtype=np.float32,
+    ).squeeze()
+
+    if audio.size == 0:
+        raise RuntimeError(
+            "IndicF5 returned an empty waveform."
+        )
+
+    peak = float(np.max(np.abs(audio)))
+
+    if peak > 1.0:
+        audio = audio / peak
+
+    sf.write(
+        args.output,
+        audio,
+        samplerate=24000,
+        subtype="PCM_16",
+    )
+
+    print(
+        f"Audio saved: {args.output}",
+        flush=True,
+    )
+    print(
+        f"Samples: {audio.size}",
+        flush=True,
+    )
+    print(
+        f"Duration: {audio.size / 24000:.2f} seconds",
+        flush=True,
+    )
+
+
+if __name__ == "__main__":
+    main()
