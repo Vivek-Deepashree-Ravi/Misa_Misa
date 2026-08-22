@@ -67,15 +67,6 @@
                 id="composer"
                 class="composer"
             >
-                <select
-                    id="language"
-                    aria-label="Speech language"
-                    title="Speech language"
-                >
-                    <option value="en">EN</option>
-                    <option value="kn">ಕನ್ನಡ</option>
-                </select>
-
                 <input
                     id="message"
                     type="text"
@@ -160,10 +151,6 @@
             "microphone"
         );
 
-        const languageSelect = document.getElementById(
-            "language"
-        );
-
         const clearButton = document.getElementById(
             "clear-chat"
         );
@@ -204,8 +191,6 @@
         let audioChunks = [];
         let isRecording = false;
         let audioLevel = 0;
-
-        let replyLanguage = "en";
 
         let currentSpeechAudio = null;
         let currentSpeechUrl = null;
@@ -457,7 +442,6 @@
 
             messageInput.disabled = busy;
             microphoneButton.disabled = busy;
-            languageSelect.disabled = busy;
 
             sendButton.disabled = (
                 busy
@@ -488,10 +472,7 @@
         }
 
 
-        async function speakReply(
-            text,
-            language
-        ) {
+        async function speakReply(text) {
             const cleanText = String(
                 text || ""
             ).trim();
@@ -516,9 +497,7 @@
 
             setOrbState(
                 "speaking",
-                language === "kn"
-                    ? "ಮೀಸಾ ಮಾತನಾಡುತ್ತಿದ್ದಾಳೆ..."
-                    : "Misa is speaking..."
+                "Misa is speaking..."
             );
 
             try {
@@ -536,7 +515,7 @@
                         body: JSON.stringify(
                             {
                                 text: cleanText,
-                                language: language,
+                                language: "en",
                             }
                         ),
                     }
@@ -809,10 +788,7 @@
                         updateComposer();
 
                         if (completedReply) {
-                            speakReply(
-                                completedReply,
-                                replyLanguage
-                            );
+                            speakReply(completedReply);
 
                         } else {
                             setOrbState(
@@ -911,10 +887,6 @@
                 return;
             }
 
-            replyLanguage = (
-                languageSelect.value
-            );
-
             stopSpeech();
 
             addMessage(
@@ -945,6 +917,7 @@
                 JSON.stringify(
                     {
                         message: text,
+                        language: "en",
                     }
                 )
             );
@@ -1109,7 +1082,7 @@
 
             formData.append(
                 "language",
-                languageSelect.value
+                "en"
             );
 
             try {

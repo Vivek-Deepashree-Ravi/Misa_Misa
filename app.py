@@ -66,20 +66,10 @@ ENGLISH_STT_URL = os.getenv(
     "http://english-stt:9002/inference",
 )
 
-KANNADA_STT_URL = os.getenv(
-    "KANNADA_STT_URL",
-    "http://kannada-stt:9001/transcribe",
-)
-
 
 # ---------------------------------------------------------
 # Text-to-speech configuration
 # ---------------------------------------------------------
-
-KANNADA_TTS_URL = os.getenv(
-    "KANNADA_TTS_URL",
-    "http://kannada-tts:9003/synthesize",
-)
 
 ENGLISH_TTS_URL = os.getenv(
     "ENGLISH_TTS_URL",
@@ -90,7 +80,7 @@ ENGLISH_TTS_URL = os.getenv(
 # Maximum uploaded microphone recording: 16 MiB.
 MAX_AUDIO_BYTES = 16 * 1024 * 1024
 
-# Maximum amount of text sent to either TTS service.
+# Maximum amount of text sent to the TTS service.
 MAX_TTS_TEXT_LENGTH = 1000
 
 app.config["MAX_CONTENT_LENGTH"] = MAX_AUDIO_BYTES
@@ -364,9 +354,7 @@ def build_ollama_payload(
 ):
     return {
         "model": OLLAMA_MODEL,
-        "messages": build_messages(
-            user_message
-        ),
+        "messages": build_messages(user_message),
         "stream": stream,
         "think": False,
         "keep_alive": -1,
@@ -573,23 +561,12 @@ def home():
 @app.post("/transcribe")
 def transcribe_audio():
     """
-    Send recorded audio to the selected local STT service.
-
-    Supported languages:
-    - en: Whisper Large V3 Turbo
-    - kn: AI4Bharat IndicConformer
+    Send recorded audio to the local English Whisper STT service.
     """
 
     uploaded_audio = request.files.get(
         "audio"
     )
-
-    language = str(
-        request.form.get(
-            "language",
-            "en",
-        )
-    ).strip().lower()
 
     if uploaded_audio is None:
         return jsonify(
@@ -597,19 +574,6 @@ def transcribe_audio():
                 "error": (
                     "Multipart field 'audio' "
                     "is required."
-                )
-            }
-        ), 400
-
-    if language not in {
-        "en",
-        "kn",
-    }:
-        return jsonify(
-            {
-                "error": (
-                    "Language must be "
-                    "'en' or 'kn'."
                 )
             }
         ), 400
@@ -662,36 +626,22 @@ def transcribe_audio():
     content_type = "audio/wav"
 
     try:
-        if language == "en":
-            response = requests.post(
-                ENGLISH_STT_URL,
-                files={
-                    "file": (
-                        filename,
-                        audio_bytes,
-                        content_type,
-                    )
-                },
-                data={
-                    "language": "en",
-                    "response_format": "json",
-                    "temperature": "0.0",
-                },
-                timeout=(10, 120),
-            )
-
-        else:
-            response = requests.post(
-                KANNADA_STT_URL,
-                files={
-                    "audio": (
-                        filename,
-                        audio_bytes,
-                        content_type,
-                    )
-                },
-                timeout=(10, 120),
-            )
+        response = requests.post(
+            ENGLISH_STT_URL,
+            files={
+                "file": (
+                    filename,
+                    audio_bytes,
+                    content_type,
+                )
+            },
+            data={
+                "language": "en",
+                "response_format": "json",
+                "temperature": "0.0",
+            },
+            timeout=(10, 120),
+        )
 
         response.raise_for_status()
         result = response.json()
@@ -716,7 +666,7 @@ def transcribe_audio():
         return jsonify(
             {
                 "text": transcript,
-                "language": language,
+                "language": "en",
             }
         )
 
@@ -779,11 +729,7 @@ def transcribe_audio():
 @app.post("/synthesize")
 def synthesize_audio():
     """
-    Route text to the selected local TTS service.
-
-    Supported languages:
-    - en: Kokoro English TTS
-    - kn: AI4Bharat IndicF5 Kannada TTS
+    Send text to the local English Kokoro TTS service.
     """
 
     body = request.get_json(
@@ -797,31 +743,11 @@ def synthesize_audio():
         )
     ).strip()
 
-    language = str(
-        body.get(
-            "language",
-            "kn",
-        )
-    ).strip().lower()
-
     if not text:
         return jsonify(
             {
                 "error": (
                     "JSON field 'text' is required."
-                )
-            }
-        ), 400
-
-    if language not in {
-        "en",
-        "kn",
-    }:
-        return jsonify(
-            {
-                "error": (
-                    "Language must be "
-                    "'en' or 'kn'."
                 )
             }
         ), 400
@@ -836,19 +762,12 @@ def synthesize_audio():
             }
         ), 413
 
-    if language == "en":
-        tts_url = ENGLISH_TTS_URL
-        output_filename = "misa-english.wav"
-        service_name = "English Kokoro TTS"
-
-    else:
-        tts_url = KANNADA_TTS_URL
-        output_filename = "misa-kannada.wav"
-        service_name = "Kannada IndicF5 TTS"
+    output_filename = "misa-english.wav"
+    service_name = "English Kokoro TTS"
 
     try:
         response = requests.post(
-            tts_url,
+            ENGLISH_TTS_URL,
             json={
                 "text": text,
             },
@@ -891,7 +810,7 @@ def synthesize_audio():
                     f'filename="{output_filename}"'
                 ),
                 "Cache-Control": "no-store",
-                "X-Misa-Language": language,
+                "X-Misa-Language": "en",
             },
         )
 
@@ -981,10 +900,12 @@ def synthesize_audio():
 
 @app.post("/chat")
 def chat():
+    payload = request.get_json(
+        silent=True
+    ) or {}
+
     message = read_message(
-        request.get_json(
-            silent=True
-        ) or {}
+        payload
     )
 
     if not message:
@@ -995,9 +916,7 @@ def chat():
         ), 400
 
     try:
-        reply = generate_reply(
-            message
-        )
+        reply = generate_reply(message)
 
         if not reply:
             return jsonify(
@@ -1070,8 +989,12 @@ def websocket_chat(ws):
             break
 
         try:
+            payload = json.loads(
+                raw_data
+            )
+
             message = read_message(
-                json.loads(raw_data)
+                payload
             )
 
             if not message:

@@ -1,15 +1,5 @@
 [
   {
-    "id": "04113057-17d4-4ee4-9e3f-133cadf35cd5",
-    "memory": "Assistant introduced Misa-Misa, a Japanese model and actress born in Kyoto, known for her work in Gothic Lolita fashion and accessories, and her role as Sonu's assistant.",
-    "hash": "4e49c93f3a0c45c06444f913a559b972",
-    "metadata": null,
-    "created_at": "2026-08-16T11:58:29.109330+00:00",
-    "updated_at": "2026-08-16T11:58:29.109330+00:00",
-    "user_id": "sonu",
-    "attributed_to": "assistant"
-  },
-  {
     "id": "38b6300a-642c-4eda-a7ba-1297d7e5aa64",
     "memory": "Assistant shared Misa-Misa's background as a model and actress, emphasizing her career in the entertainment industry.",
     "hash": "3b2ed00156c32b1bb2795a5b431ac7b5",
@@ -30,16 +20,6 @@
     "attributed_to": "assistant"
   },
   {
-    "id": "6194ef29-cb02-424a-8f14-5b70d16c2c21",
-    "memory": "Assistant offers to help with Python programming",
-    "hash": "23b73b50e2e6e8fe2d04287105cca2b5",
-    "metadata": null,
-    "created_at": "2026-08-16T11:59:27.705358+00:00",
-    "updated_at": "2026-08-16T11:59:27.705358+00:00",
-    "user_id": "sonu",
-    "attributed_to": "assistant"
-  },
-  {
     "id": "6c079895-e9aa-419f-bafe-f010fd57ef79",
     "memory": "Assistant mentioned Misa-Misa's passion for Gothic Lolita fashion and her collection of accessories.",
     "hash": "acc32e4de97455a7a6bfcb6d627de01c",
@@ -48,16 +28,6 @@
     "updated_at": "2026-08-16T11:58:29.109374+00:00",
     "user_id": "sonu",
     "attributed_to": "assistant"
-  },
-  {
-    "id": "b6109039-95b6-447a-a264-7a82db2e42af",
-    "memory": "User prefers Python for programming",
-    "hash": "650802c76a435b2a806cdf6e4b73436c",
-    "metadata": null,
-    "created_at": "2026-08-16T11:59:27.705302+00:00",
-    "updated_at": "2026-08-16T11:59:27.705302+00:00",
-    "user_id": "sonu",
-    "attributed_to": "user"
   },
   {
     "id": "d005da3f-ba4f-48da-9eed-95dab9c528d0",
