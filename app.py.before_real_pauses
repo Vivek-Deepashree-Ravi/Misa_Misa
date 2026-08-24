@@ -1,12 +1,10 @@
 import json
-import io
 import os
 import random
 import re
 import sqlite3
 import subprocess
 import tempfile
-import wave
 from pathlib import Path
 from threading import Thread
 
@@ -781,9 +779,9 @@ def naturalize_speech(text):
     # Keep this probability low so it remains natural.
     if random.random() < 0.10:
         lead_ins = (
-            "Hmm [[pause:350]] ",
-            "Well [[pause:300]] ",
-            "Okay [[pause:250]] ",
+            "Hmm... ",
+            "Well... ",
+            "Okay... ",
         )
 
         spoken_text = (
@@ -794,7 +792,7 @@ def naturalize_speech(text):
     # Turn certain phrases into slightly longer pauses.
     spoken_text = re.sub(
         r"\bLet me think[,.]?\s*",
-        "Let me think [[pause:450]] ",
+        "Let me think... ",
         spoken_text,
         count=1,
         flags=re.IGNORECASE,
@@ -802,7 +800,7 @@ def naturalize_speech(text):
 
     spoken_text = re.sub(
         r"\bHowever,\s+",
-        "However [[pause:300]] ",
+        "However... ",
         spoken_text,
         count=1,
         flags=re.IGNORECASE,
@@ -810,7 +808,7 @@ def naturalize_speech(text):
 
     spoken_text = re.sub(
         r"\bActually,\s+",
-        "Actually [[pause:350]] ",
+        "Actually... ",
         spoken_text,
         count=1,
         flags=re.IGNORECASE,
@@ -823,188 +821,7 @@ def naturalize_speech(text):
         spoken_text,
     ).strip()
 
-    return spoken_text
-
-
-TTS_PAUSE_PATTERN = re.compile(
-    r"\[\[pause:(\d{1,4})\]\]"
-)
-
-
-def request_kokoro_audio(text, service_name):
-    """Generate one WAV segment with the local Kokoro service."""
-
-    response = requests.post(
-        ENGLISH_TTS_URL,
-        json={
-            "text": text,
-        },
-        timeout=(10, 600),
-    )
-
-    response.raise_for_status()
-
-    content_type = response.headers.get(
-        "Content-Type",
-        "",
-    ).lower()
-
-    if (
-        "audio" not in content_type
-        or not response.content
-    ):
-        app.logger.error(
-            "%s returned a non-audio response: %s",
-            service_name,
-            response.text[:500],
-        )
-
-        raise ValueError(
-            f"{service_name} returned an invalid audio response."
-        )
-
-    return response.content
-
-
-def combine_wav_segments(items):
-    """Combine Kokoro WAV segments and explicit pauses."""
-
-    output_buffer = io.BytesIO()
-    output_wav = None
-    expected_format = None
-
-    try:
-        for item_type, item_value in items:
-            if item_type == "audio":
-                input_buffer = io.BytesIO(
-                    item_value
-                )
-
-                with wave.open(
-                    input_buffer,
-                    "rb",
-                ) as input_wav:
-                    current_format = (
-                        input_wav.getnchannels(),
-                        input_wav.getsampwidth(),
-                        input_wav.getframerate(),
-                        input_wav.getcomptype(),
-                    )
-
-                    if expected_format is None:
-                        expected_format = current_format
-                        output_wav = wave.open(
-                            output_buffer,
-                            "wb",
-                        )
-                        output_wav.setnchannels(
-                            current_format[0]
-                        )
-                        output_wav.setsampwidth(
-                            current_format[1]
-                        )
-                        output_wav.setframerate(
-                            current_format[2]
-                        )
-                        output_wav.setcomptype(
-                            current_format[3],
-                            "not compressed",
-                        )
-
-                    elif current_format != expected_format:
-                        raise ValueError(
-                            "Kokoro returned incompatible WAV segments."
-                        )
-
-                    output_wav.writeframes(
-                        input_wav.readframes(
-                            input_wav.getnframes()
-                        )
-                    )
-
-            elif item_type == "pause":
-                if output_wav is None or expected_format is None:
-                    continue
-
-                duration_ms = max(
-                    0,
-                    min(int(item_value), 2000),
-                )
-
-                silence_frames = int(
-                    expected_format[2]
-                    * duration_ms
-                    / 1000
-                )
-
-                silence_bytes = (
-                    b"\x00"
-                    * silence_frames
-                    * expected_format[0]
-                    * expected_format[1]
-                )
-
-                output_wav.writeframes(
-                    silence_bytes
-                )
-
-        if output_wav is None:
-            raise ValueError(
-                "Kokoro returned no WAV segments."
-            )
-
-    finally:
-        if output_wav is not None:
-            output_wav.close()
-
-    return output_buffer.getvalue()
-
-
-def synthesize_spoken_text(
-    spoken_text,
-    service_name,
-):
-    """Generate speech and convert pause markers into real silence."""
-
-    parts = TTS_PAUSE_PATTERN.split(
-        spoken_text
-    )
-
-    # No explicit pause: retain the original single-request path.
-    if len(parts) == 1:
-        return request_kokoro_audio(
-            spoken_text,
-            service_name,
-        )
-
-    output_items = []
-
-    for index, part in enumerate(parts):
-        if index % 2 == 0:
-            segment_text = part.strip()
-
-            if segment_text:
-                output_items.append(
-                    (
-                        "audio",
-                        request_kokoro_audio(
-                            segment_text,
-                            service_name,
-                        ),
-                    )
-                )
-
-        else:
-            output_items.append(
-                (
-                    "pause",
-                    int(part),
-                )
-            )
-
-    return combine_wav_segments(
-        output_items
-    )
+    return spoken_text[:MAX_TTS_TEXT_LENGTH]
 
 
 # ---------------------------------------------------------
@@ -1063,13 +880,42 @@ def synthesize_audio():
     service_name = "English Kokoro TTS"
 
     try:
-        audio_content = synthesize_spoken_text(
-            spoken_text,
-            service_name,
+        response = requests.post(
+            ENGLISH_TTS_URL,
+            json={
+                "text": spoken_text,
+            },
+            timeout=(10, 600),
         )
 
+        response.raise_for_status()
+
+        content_type = response.headers.get(
+            "Content-Type",
+            "",
+        ).lower()
+
+        if (
+            "audio" not in content_type
+            or not response.content
+        ):
+            app.logger.error(
+                "%s returned a non-audio response: %s",
+                service_name,
+                response.text[:500],
+            )
+
+            return jsonify(
+                {
+                    "error": (
+                        f"{service_name} returned "
+                        "an invalid audio response."
+                    )
+                }
+            ), 502
+
         return app.response_class(
-            response=audio_content,
+            response=response.content,
             status=200,
             mimetype="audio/wav",
             headers={
@@ -1148,18 +994,6 @@ def synthesize_audio():
                         "generate speech."
                     )
                 )
-            }
-        ), 502
-
-    except ValueError as error:
-        app.logger.exception(
-            "%s returned invalid WAV audio",
-            service_name,
-        )
-
-        return jsonify(
-            {
-                "error": str(error)
             }
         ), 502
 
