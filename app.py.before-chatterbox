@@ -77,8 +77,7 @@ ENGLISH_STT_URL = os.getenv(
 
 ENGLISH_TTS_URL = os.getenv(
     "ENGLISH_TTS_URL",
-    # "http://english-tts:9004/synthesize",
-    "http://chatterbox-tts:9005/synthesize",
+    "http://english-tts:9004/synthesize",
 )
 
 
@@ -1048,28 +1047,20 @@ def synthesize_audio():
             }
         ), 413
 
-    # natural_speech_enabled = body.get(
-    #     "natural_speech",
-    #     True,
-    # )
+    natural_speech_enabled = body.get(
+        "natural_speech",
+        True,
+    )
 
-    # if natural_speech_enabled:
-    #     spoken_text = naturalize_speech(
-    #         text
-    #     )
-    # else:
-    #     spoken_text = text
+    if natural_speech_enabled:
+        spoken_text = naturalize_speech(
+            text
+        )
+    else:
+        spoken_text = text
 
-    # output_filename = "misa-english.wav"
-    # service_name = "English Kokoro TTS"
-
-
-    # Chatterbox provides its own rhythm and expression.
-    natural_speech_enabled = False
-    spoken_text = text
-
-    output_filename = "misa-chatterbox.wav"
-    service_name = "English Chatterbox Nano TTS"
+    output_filename = "misa-english.wav"
+    service_name = "English Kokoro TTS"
 
     try:
         audio_content = synthesize_spoken_text(

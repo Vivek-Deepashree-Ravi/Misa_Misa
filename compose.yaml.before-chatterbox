@@ -48,8 +48,7 @@ services:
 
       # Local English speech services.
       ENGLISH_STT_URL: http://english-stt:9002/inference
-      # ENGLISH_TTS_URL: http://english-tts:9004/synthesize
-      ENGLISH_TTS_URL: http://chatterbox-tts:9005/synthesize
+      ENGLISH_TTS_URL: http://english-tts:9004/synthesize
 
     depends_on:
       ollama:
@@ -249,11 +248,8 @@ services:
       - "Reply only with: ready"
 
     depends_on:
-      chatterbox-tts:
-        condition: service_healthy
       model-pull:
         condition: service_completed_successfully
-      
 
     restart: "no"
 
@@ -275,49 +271,6 @@ services:
 
     restart: unless-stopped
 
-  # -------------------------------------------------------
-  # Expressive English text-to-speech
-  # -------------------------------------------------------
-  chatterbox-tts:
-    build:
-      context: ./voice/chatterbox
-      dockerfile: Dockerfile
-
-    image: misa-chatterbox-nano:cpu
-    container_name: misa-chatterbox-nano
-
-    environment:
-      HF_HOME: /cache/huggingface
-      TORCH_HOME: /cache/torch
-      TORCH_THREADS: "16"
-      OMP_NUM_THREADS: "16"
-      MKL_NUM_THREADS: "16"
-      MAX_TEXT_LENGTH: "1000"
-
-    ports:
-      - "127.0.0.1:9005:9005"
-
-    volumes:
-      - type: volume
-        source: chatterbox_cache
-        target: /cache
-
-    shm_size: 1gb
-
-    healthcheck:
-      test:
-        - CMD
-        - python
-        - -c
-        - "import urllib.request; urllib.request.urlopen('http://localhost:9005/health', timeout=5)"
-
-      interval: 15s
-      timeout: 10s
-      retries: 60
-      start_period: 10m
-
-    restart: unless-stopped
-
 
 # ---------------------------------------------------------
 # Persistent Docker volumes
@@ -332,6 +285,3 @@ volumes:
 
   kokoro_cache:
     name: misa_kokoro_cache
-
-  chatterbox_cache:
-    name: misa_chatterbox_cache
